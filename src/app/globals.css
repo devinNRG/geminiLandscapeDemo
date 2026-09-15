@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-google-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/*
+ * Gemini's inline "thinking" indicator: three dots bounce in a row, morph
+ * into an equilateral triangle, spin as a group, swap which vertex each dot
+ * occupies (so they cross paths near the center), then morph back to a row
+ * and repeat. The three dot-* keyframes are independent (not one shared
+ * keyframe with staggered delays) because the row phase needs three
+ * different fixed x-positions at once, which a phase-shifted single
+ * keyframe can't express.
+ */
+@keyframes thinking-spin {
+  0%,
+  38% {
+    transform: rotate(0deg);
+  }
+  88%,
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes thinking-dot-1 {
+  0%,
+  100% {
+    transform: translate(-0.55cqw, 0);
+  }
+  8% {
+    transform: translate(-0.55cqw, -0.35cqw);
+  }
+  16%,
+  25% {
+    transform: translate(-0.55cqw, 0);
+  }
+  38%,
+  60% {
+    transform: translate(0, -0.8cqw); /* top vertex */
+  }
+  72%,
+  88% {
+    transform: translate(0.69cqw, 0.4cqw); /* right vertex */
+  }
+}
+
+@keyframes thinking-dot-2 {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  13% {
+    transform: translate(0, -0.35cqw);
+  }
+  21%,
+  25% {
+    transform: translate(0, 0);
+  }
+  38%,
+  60% {
+    transform: translate(0.69cqw, 0.4cqw); /* right vertex */
+  }
+  72%,
+  88% {
+    transform: translate(-0.69cqw, 0.4cqw); /* left vertex */
+  }
+}
+
+@keyframes thinking-dot-3 {
+  0%,
+  100% {
+    transform: translate(0.55cqw, 0);
+  }
+  18% {
+    transform: translate(0.55cqw, -0.35cqw);
+  }
+  24%,
+  25% {
+    transform: translate(0.55cqw, 0);
+  }
+  38%,
+  60% {
+    transform: translate(-0.69cqw, 0.4cqw); /* left vertex */
+  }
+  72%,
+  88% {
+    transform: translate(0, -0.8cqw); /* top vertex */
+  }
+}
+
+/*
+ * Entrance for content that mounts later in response to a tap (e.g. the
+ * FoodOrder handoff card) rather than as part of a pre-mounted Reveal
+ * stagger sequence — same fade + lift as Reveal, just played once on mount.
+ */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.8cqw);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* indeterminate "still working" sweep for the Gemini Intelligence progress rail */
+@keyframes scan-bar {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(420%);
+  }
+}
