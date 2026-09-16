@@ -2,8 +2,8 @@
  * Generic shape for a generated Gemini answer. `sections` is the part whose
  * length/height is unbounded and content-dependent — it's what each display
  * pattern in `patterns/` is responsible for laying out without overflowing
- * the kiosk frame. `promptLines`, `introLines`, and `docCard` are small,
- * fixed-size pieces every pattern can place as it sees fit.
+ * the kiosk frame. `promptLines` and `introLines` are small, fixed-size
+ * pieces every pattern can place as it sees fit.
  */
 export type Section = {
   id: string;
@@ -13,16 +13,9 @@ export type Section = {
   items: string[][];
 };
 
-export type DocCardData = {
-  title: string;
-  subtitle: string;
-  cta: string;
-};
-
 export type ResponseContent = {
   promptLines: string[];
   introLines: string[];
-  docCard: DocCardData;
   sections: Section[];
 };
 
@@ -38,7 +31,6 @@ export const WEEKEND_RESPONSE: ResponseContent = {
     "sheet. Pack light: the house has towels, a washer",
     "and beach gear.",
   ],
-  docCard: { title: "The weekend plan", subtitle: "Google Docs", cta: "Open" },
   sections: [
     {
       id: "arrivals",
@@ -84,7 +76,6 @@ export const BAND_TOUR_RESPONSE: ResponseContent = {
   introLines: [
     "Here is a three day plan for The Tuesday Club around both gigs: drive times, a hotel by the venue, where to eat after each show, and home on Sunday.",
   ],
-  docCard: { title: "The tour route", subtitle: "Google Maps", cta: "Open" },
   sections: [
     {
       id: "copper-owl",
@@ -129,12 +120,14 @@ export const BAND_TOUR_RESPONSE: ResponseContent = {
   ],
 };
 
-export type PatternId = "paginated" | "measuredColumns";
+export type PatternId = "scroll" | "measuredColumns";
 
 export type PatternProps = {
   content: ResponseContent;
   /** Whether this pattern is the one currently on screen — patterns reset their internal nav state on the false→true edge. */
   active: boolean;
+  /** Fires once the answer has fully revealed — drives the shared "back to landing" corner button in page.tsx. */
+  onComplete?: () => void;
 };
 
 /**
@@ -185,7 +178,9 @@ export const FRIDAY_NIGHT_TASK: TaskDemoContent = {
   introText: "I’m on it.",
   steps: [
     { id: "working", heading: "Working on your task", subtext: "Automating tasks…" },
+    { id: "selecting", heading: "Task in progress", subtext: "Selecting Lotus Thai", progress: 0.25 },
     { id: "progress", heading: "Task in progress", subtext: "Automation is running", progress: 0.55 },
+    { id: "cart", heading: "Task in progress", subtext: "Adding your usual order to cart", progress: 0.8 },
     { id: "finish", heading: "Finish up your task", subtext: "Your Lotus Thai order is prepared." },
   ],
   foodOrder: {
@@ -207,23 +202,88 @@ export const FRIDAY_NIGHT_TASK: TaskDemoContent = {
   },
 };
 
+/** A single message bubble in the Messages-app scene — shared between the two
+ * Friday-night branches (each opens on a different conversation) and the
+ * "go out" branch's later confirmation exchange, so the bubble styling lives
+ * in one place (`MessagesScene.tsx`) instead of being re-authored per screen. */
+export type ChatBubble =
+  | { kind: "outgoing"; text: string }
+  | { kind: "incoming"; name: string; avatar: string; text: string };
+
+export const STAY_IN_MESSAGES: ChatBubble[] = [
+  { kind: "outgoing", text: "Friday night, what are we doing?" },
+  { kind: "incoming", name: "Priya", avatar: "/gemini/friday-night/avatar-priya.png", text: "let’s just stay in" },
+  { kind: "incoming", name: "Marco", avatar: "/gemini/friday-night/avatar-marco.png", text: "let’s do our usual order" },
+];
+
+export const GO_OUT_MESSAGES: ChatBubble[] = [
+  { kind: "outgoing", text: "Friday night, what are we doing?" },
+  { kind: "incoming", name: "Priya", avatar: "/gemini/friday-night/avatar-priya.png", text: "let’s go to sushi tonight" },
+  { kind: "incoming", name: "Marco", avatar: "/gemini/friday-night/avatar-marco.png", text: "only if there are vegetarian and gluten free options" },
+];
+
+export type SushiResult = {
+  id: string;
+  name: string;
+  rating: number;
+  status: string;
+  closesAt: string;
+  address: string;
+  distance: string;
+  /** Whether tapping this card routes anywhere yet — only one result is wired to the built
+   * confirmation flow, same active/disabled convention as every other pill in this app. */
+  active?: boolean;
+};
+
+/**
+ * The "go out" branch's response — a local-search answer (map + result list)
+ * rather than a text answer or a task-automation flow, so it gets its own
+ * shape and its own renderer (`GoOutResponse.tsx`). Ends by drafting
+ * `confirmation` into the group chat once the one active result is tapped.
+ */
+export type SushiSearchContent = {
+  promptLines: string[];
+  introText: string;
+  mapImage: string;
+  results: SushiResult[];
+  confirmation: ChatBubble[];
+};
+
+export const GO_OUT_SEARCH: SushiSearchContent = {
+  promptLines: ["Find the best sushi restaurants near me"],
+  introText: "Three sushi spots near you fit the thread, all open tonight. Vegetarian rolls and gluten free soy at every one.",
+  mapImage: "/gemini/friday-night/map-sushi.png",
+  results: [
+    { id: "kanpai", name: "Kanpai Sushi", rating: 4.7, status: "Open", closesAt: "Closes 11 PM", address: "214 Sawtelle Blvd", distance: "0.4 mi", active: true },
+    { id: "umi", name: "Umi Table", rating: 4.5, status: "Open", closesAt: "Closes 10.30 PM", address: "88 Gayley Ave", distance: "0.7 mi" },
+    { id: "aoki", name: "Aoki Street Sushi", rating: 4.8, status: "Open", closesAt: "Closes 12 AM", address: "406 Broxton Ave", distance: "1.1 mi" },
+  ],
+  confirmation: [
+    { kind: "outgoing", text: "Kanpai Sushi tonight? Veggie rolls and gluten free soy, five minutes away" },
+    { kind: "incoming", name: "Priya", avatar: "/gemini/friday-night/avatar-priya.png", text: "perfect. 7.30?" },
+    { kind: "incoming", name: "Marco", avatar: "/gemini/friday-night/avatar-marco.png", text: "in." },
+  ],
+};
+
 export type Persona = {
   id: string;
   label: string;
   sublabel: string;
   image: string;
-  /** Left-edge offset (percent, negative) that centers this persona's face within the oversized background image — each source photo needs its own crop. */
-  imageOffsetPct: number;
+  /** Horizontal focal point (0-100, `object-position` X) that keeps this persona's face centered under `object-fit: cover` — each source photo needs its own crop. */
+  imageFocusXPct: number;
   /** Whether this card routes anywhere yet — disabled/greyed out on the landing screen until it does. */
   active?: boolean;
 };
 
 export const PERSONAS: Persona[] = [
-  { id: "student", label: "The student, 20", sublabel: "Student and guitar player", image: "/gemini/personas/student.png", imageOffsetPct: -132.66, active: true },
-  { id: "traveler", label: "The traveler, 28", sublabel: "Professional who loves to travel", image: "/gemini/personas/traveler.png", imageOffsetPct: -122.75, active: true },
-  { id: "parent", label: "The parent, 38", sublabel: "Parent with school and work obligations", image: "/gemini/personas/parent.png", imageOffsetPct: -142.56, active: true },
-  { id: "custom", label: "Add yourself", sublabel: "A few questions build a rundown that fits your day", image: "/gemini/personas/custom.png", imageOffsetPct: -187.53 },
+  { id: "student", label: "The student, 20", sublabel: "Student and guitar player", image: "/gemini/personas/student.png", imageFocusXPct: 40, active: true },
+  { id: "traveler", label: "The traveler, 28", sublabel: "Professional who loves to travel", image: "/gemini/personas/traveler.png", imageFocusXPct: 37, active: true },
+  { id: "parent", label: "The parent, 38", sublabel: "Parent with school and work obligations", image: "/gemini/personas/parent.png", imageFocusXPct: 44, active: true },
 ];
+
+/** Landing-screen layout options — both are live explorations pending client sign-off, switchable at runtime via the picker in `page.tsx`. */
+export type LandingLayoutId = "cards" | "glassPills";
 
 export type RundownPill = {
   id: string;

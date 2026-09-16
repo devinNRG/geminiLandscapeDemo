@@ -3,6 +3,13 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Point Material 3's type tokens at the app's existing Google Sans instead of
+     pulling in Roboto (the @material/web quick-start's default) as a second
+     unused typeface — every md-* component and .md-typescale-* class reads
+     typography off these two ref tokens. */
+  --md-ref-typeface-brand: var(--font-google-sans);
+  --md-ref-typeface-plain: var(--font-google-sans);
 }
 
 @theme inline {
@@ -10,6 +17,17 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-google-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Gemini's own dark chrome — two elevation tiers (a card/bubble background,
+     and a slightly lighter surface for interactive chrome sitting on or above
+     one, e.g. the compose bar and a card's own CTA chip) plus one muted-text
+     color. Scoped to Gemini's own UI only — MessagesScene and FoodOrderCard
+     are deliberately distinct third-party app skins with their own palettes,
+     not drift to fold in here. Not dark/light-mode-aware (unlike background/
+     foreground above) since the kiosk chrome itself is always dark. */
+  --color-surface-card: #141414;
+  --color-surface-raised: #1c1c1c;
+  --color-muted: #9a9b9c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -133,5 +151,19 @@ body {
   }
   100% {
     transform: translateX(420%);
+  }
+}
+
+/* gentle "tap here" attention cue for a primed submit/CTA button — a soft
+   scale + glow breathe, not a hard blink, so it draws the eye without nagging */
+@keyframes subtle-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(76, 141, 246, 0.45);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 1cqw 0.2cqw rgba(76, 141, 246, 0.3);
   }
 }

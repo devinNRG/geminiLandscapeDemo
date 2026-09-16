@@ -49,7 +49,7 @@ export default function RundownScreen({
       {/* pointer-events-none: purely decorative text — without this its full-width box
           (even though the text itself is centered) sits above the back button in paint
           order and swallows clicks meant for it */}
-      <p className="relative z-10 pointer-events-none pt-[5.63cqw] text-center text-[3.2cqw] leading-[3.84cqw] text-white">
+      <p className="relative z-10 pointer-events-none pt-[5.63cqw] text-center text-[2.9cqw] leading-[3.5cqw] text-white">
         <span>Hi, </span>
         <span className="font-medium">here&rsquo;s your daily rundown</span>
       </p>
@@ -62,7 +62,7 @@ export default function RundownScreen({
               type="button"
               disabled={!pill.active}
               onClick={() => onSelectPill(pill.id)}
-              className={`flex h-[5.16cqw] items-center rounded-full border px-[2.66cqw] text-left text-[1.55cqw] leading-[1.98cqw] backdrop-blur-xl ${
+              className={`flex h-[5.16cqw] items-center rounded-full border px-[2.66cqw] text-left text-[1.5cqw] leading-[1.92cqw] backdrop-blur-xl ${
                 pill.active
                   ? "border-white/15 bg-white/10 text-white active:bg-white/20"
                   : "pointer-events-none border-white/8 bg-white/4 text-white/40"

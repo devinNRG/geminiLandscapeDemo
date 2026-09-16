@@ -18,15 +18,17 @@ const THINKING_CAPTIONS = ["Thinking…", "Checking your order history…", "Set
  * hands off to a third-party app card (FoodOrder) for the user to complete
  * — matching how the source design deliberately breaks from Gemini's own
  * dark chrome into a light "third-party app" card to signal the handoff.
+ * `onComplete` fires once payment settles — it doesn't render its own "back"
+ * affordance; page.tsx's shared corner button handles exiting the demo.
  */
 export default function TaskAutomationResponse({
   content,
   active,
-  onDone,
+  onComplete,
 }: {
   content: TaskDemoContent;
   active: boolean;
-  onDone: () => void;
+  onComplete?: () => void;
 }) {
   const { showThinking, contentShown } = useThinkingPhase(active);
 
@@ -55,7 +57,7 @@ export default function TaskAutomationResponse({
 
   return (
     <div className="flex h-full items-start justify-center px-[10cqw] pt-[2.3cqw] pb-[10.6cqw]">
-      <div className="flex flex-col text-[1.25cqw] leading-[1.77cqw]" style={{ width: SINGLE_COLUMN_WIDTH }}>
+      <div className="flex flex-col text-[1.25cqw] leading-[1.8cqw]" style={{ width: SINGLE_COLUMN_WIDTH }}>
         {/* the prompt bubble disappears once FoodOrder opens — its job (showing what was
             asked) is done, and the checkout card needs the room to fit without overlap */}
         {!showApp && (
@@ -94,7 +96,7 @@ export default function TaskAutomationResponse({
           )
         ) : (
           <div className="[animation:fade-in-up_500ms_ease-out]">
-            <FoodOrderCard data={content.foodOrder} paid={paid} onPay={() => setPaid(true)} onDone={onDone} />
+            <FoodOrderCard data={content.foodOrder} paid={paid} onPay={() => setPaid(true)} onComplete={onComplete} />
           </div>
         )}
       </div>
@@ -107,7 +109,7 @@ export default function TaskAutomationResponse({
  * around the badge icon rather than a progress bar). */
 function WorkingCard({ step }: { step: TaskStep }) {
   return (
-    <div className="flex items-center gap-[1.3cqw] rounded-[1.6cqw] bg-[#1b1b1b] p-[1.4cqw]">
+    <div className="flex items-center gap-[1.3cqw] rounded-[1.7cqw] bg-surface-card p-[1.4cqw]">
       <div className="relative flex h-[2.6cqw] w-[2.6cqw] shrink-0 items-center justify-center">
         <img
           src="/gemini/friday-night/ring-spin.png"
@@ -131,7 +133,7 @@ function WorkingCard({ step }: { step: TaskStep }) {
  * chat scene has faded out. */
 function NotificationCard({ step, showCta, onOpenApp }: { step: TaskStep; showCta: boolean; onOpenApp: () => void }) {
   return (
-    <div className="relative overflow-hidden rounded-[1.8cqw]">
+    <div className="relative overflow-hidden rounded-[1.7cqw]">
       <img src="/gemini/friday-night/notif-gradient-bg.png" alt="" className="absolute inset-0 h-full w-full object-cover" />
       <div className="relative flex items-start gap-[1cqw] p-[1.4cqw]">
         <img src="/gemini/ph-spark.png" alt="" className="mt-[0.15cqw] h-[1.2cqw] w-[1.2cqw] shrink-0 object-cover" />
@@ -166,74 +168,73 @@ function FoodOrderCard({
   data,
   paid,
   onPay,
-  onDone,
+  onComplete,
 }: {
   data: FoodOrderData;
   paid: boolean;
   onPay: () => void;
-  onDone: () => void;
+  onComplete?: () => void;
 }) {
-  // "Payment successful" holds briefly, then swaps in place into the way back —
-  // never adds a second block below the card, which is already a tight fit
-  const [showBack, setShowBack] = useState(false);
+  // "Payment successful" holds briefly before the demo is considered done —
+  // page.tsx's shared corner button is what actually lets the user exit
+  const [settled, setSettled] = useState(false);
   useEffect(() => {
     if (!paid) {
-      setShowBack(false);
+      setSettled(false);
       return;
     }
-    const t = setTimeout(() => setShowBack(true), 1400);
+    const t = setTimeout(() => setSettled(true), 1400);
     return () => clearTimeout(t);
   }, [paid]);
 
+  useEffect(() => {
+    if (settled) onComplete?.();
+  }, [settled, onComplete]);
+
   return (
-    <div className="flex flex-col gap-[0.55cqw] rounded-[1.4cqw] bg-white p-[1cqw] text-[#1f1f1f]">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-[0.5cqw]">
-          <div className="flex h-[1.3cqw] w-[1.3cqw] items-center justify-center rounded-full bg-[#24331e]">
-            <img src="/gemini/friday-night/icon-bag.svg" alt="" className="h-[0.78cqw] w-[0.78cqw]" />
-          </div>
-          <span className="text-[1.05cqw] font-bold">{data.appName}</span>
+    <div className="flex flex-col gap-[0.45cqw] rounded-[1.4cqw] bg-white p-[0.9cqw] text-[#1f1f1f]">
+      <div className="flex items-center gap-[0.45cqw]">
+        <div className="flex h-[1.3cqw] w-[1.3cqw] items-center justify-center rounded-full bg-[#24331e]">
+          <img src="/gemini/friday-night/icon-bag.svg" alt="" className="h-[0.78cqw] w-[0.78cqw]" />
         </div>
-        <div className="flex h-[1.3cqw] w-[1.3cqw] items-center justify-center rounded-full bg-[#3c4043] text-[0.8cqw] leading-none text-white">×</div>
+        <span className="text-[1.15cqw] font-bold">{data.appName}</span>
       </div>
 
-      <div className="flex flex-col gap-[0.25cqw]">
-        <span className="text-[0.72cqw] font-medium">Delivery</span>
-        <div className="flex items-center gap-[0.5cqw]">
+      <div className="flex flex-col gap-[0.2cqw]">
+        <span className="text-[0.82cqw] font-medium">Delivery</span>
+        <div className="flex items-center gap-[0.45cqw]">
           <div className="flex h-[1.3cqw] w-[1.3cqw] shrink-0 items-center justify-center rounded-full bg-[#f6ecd9]">
             <img src="/gemini/friday-night/icon-home.svg" alt="" className="h-[0.75cqw] w-[0.75cqw]" />
           </div>
-          <span className="flex-1 text-[0.74cqw]">
+          <span className="flex-1 text-[0.82cqw]">
             {data.deliveryLabel} <span className="text-[#9a9a9a]">· {data.deliveryAddress}</span>
           </span>
-          <span className="text-[0.78cqw] text-[#9a9a9a]">›</span>
         </div>
       </div>
 
-      <div className="flex flex-col gap-[0.25cqw]">
-        <span className="text-[0.72cqw] font-medium">Order summary</span>
-        <div className="flex items-center gap-[0.5cqw]">
-          <div className="flex h-[1.3cqw] w-[1.3cqw] shrink-0 items-center justify-center rounded-full bg-[#f2c4cf] text-[0.6cqw] text-[#8d2f47]">
+      <div className="flex flex-col gap-[0.2cqw]">
+        <span className="text-[0.82cqw] font-medium">Order summary</span>
+        <div className="flex items-center gap-[0.45cqw]">
+          <div className="flex h-[1.3cqw] w-[1.3cqw] shrink-0 items-center justify-center rounded-full bg-[#f2c4cf] text-[0.66cqw] text-[#8d2f47]">
             {data.restaurantInitial}
           </div>
-          <span className="flex-1 text-[0.74cqw]">
+          <span className="flex-1 text-[0.82cqw]">
             {data.restaurantName} <span className="text-[#9a9a9a]">· {data.itemCount}</span>
           </span>
-          <span className="text-[0.78cqw] text-[#9a9a9a]">⌃</span>
         </div>
 
         {data.items.map((item) => (
-          <div key={item.id} className="flex items-center gap-[0.5cqw] border-t border-[#f1f1f1] pt-[0.25cqw]">
+          <div key={item.id} className="flex items-center gap-[0.45cqw] border-t border-[#f1f1f1] pt-[0.2cqw]">
             <img src={item.image} alt="" className="h-[1.3cqw] w-[1.3cqw] shrink-0 rounded-[0.35cqw] object-cover" />
-            <span className="flex-1 text-[0.74cqw]">
+            <span className="flex-1 text-[0.82cqw]">
               {item.name} <span className="text-[#9a9a9a]">· {item.price}</span>
             </span>
-            <span className="flex h-[1.05cqw] w-[1.05cqw] shrink-0 items-center justify-center rounded-full border border-[#e0e0e0] text-[0.58cqw]">1</span>
+            <span className="flex h-[1.05cqw] w-[1.05cqw] shrink-0 items-center justify-center rounded-full border border-[#e0e0e0] text-[0.66cqw]">1</span>
           </div>
         ))}
       </div>
 
-      <div className="flex flex-col gap-[0.16cqw] rounded-[0.6cqw] border border-[#eee] p-[0.45cqw] text-[0.62cqw]">
+      <div className="flex flex-col gap-[0.12cqw] rounded-[0.6cqw] border border-[#eee] p-[0.4cqw] text-[0.66cqw]">
         <div className="flex justify-between text-[#b5b5b5]">
           <span>Subtotal</span>
           <span>{data.subtotal}</span>
@@ -246,22 +247,14 @@ function FoodOrderCard({
           <span>Taxes &amp; other fees</span>
           <span>{data.taxes}</span>
         </div>
-        <div className="flex justify-between text-[0.72cqw] font-bold">
+        <div className="flex justify-between text-[0.82cqw] font-bold">
           <span>Total</span>
           <span>{data.total}</span>
         </div>
       </div>
 
-      {showBack ? (
-        <button
-          type="button"
-          onClick={onDone}
-          className="flex items-center justify-center gap-[0.3cqw] rounded-full bg-[#0d0d0d] py-[0.45cqw] text-[0.74cqw] text-white [animation:fade-in-up_400ms_ease-out] active:bg-black"
-        >
-          Back to your rundown
-        </button>
-      ) : paid ? (
-        <div className="flex items-center justify-center gap-[0.35cqw] rounded-full bg-[#e6f4ea] py-[0.45cqw] text-[0.74cqw] font-medium text-[#1e7e34] [animation:fade-in-up_400ms_ease-out]">
+      {paid ? (
+        <div className="flex items-center justify-center gap-[0.3cqw] rounded-full bg-[#e6f4ea] py-[0.4cqw] text-[0.82cqw] font-medium text-[#1e7e34] [animation:fade-in-up_400ms_ease-out]">
           <span>✓</span>
           <span>Payment successful</span>
         </div>
@@ -269,7 +262,7 @@ function FoodOrderCard({
         <button
           type="button"
           onClick={onPay}
-          className="flex items-center justify-center gap-[0.3cqw] rounded-full bg-[#0d0d0d] py-[0.45cqw] text-[0.74cqw] text-white active:bg-black"
+          className="flex items-center justify-center gap-[0.25cqw] rounded-full bg-[#0d0d0d] py-[0.4cqw] text-[0.82cqw] text-white active:bg-black"
         >
           <span>Pay with</span>
           <img src="/gemini/friday-night/icon-gpay.svg" alt="" className="h-[0.75cqw]" />

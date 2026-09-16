@@ -22,9 +22,9 @@ const COLUMN_GAP = 4.6; // cqw, on each side of the divider
 const SECOND_COLUMN_WRAPPER_WIDTH = `${COLUMN_GAP * 2}cqw + 42cqw`; // gap + divider + gap + column
 const SHIFT_MS = 400;
 
-export default function MeasuredColumnsPattern({ content, active }: PatternProps) {
+export default function MeasuredColumnsPattern({ content, active, onComplete }: PatternProps) {
   const { showThinking, contentShown } = useThinkingPhase(active);
-  const thinkingCaptions = ["Thinking…", `Checking ${content.docCard.subtitle}…`, "Putting your answer together…"];
+  const thinkingCaptions = ["Thinking…", "Putting your answer together…"];
   const blocks = buildContentBlocks(content);
 
   // ---- measure how many blocks fit below the bubble in one column ----
@@ -117,8 +117,14 @@ export default function MeasuredColumnsPattern({ content, active }: PatternProps
     return () => clearTimeout(t);
   }, [shiftStarted]);
 
+  // ---- fires once the answer has fully revealed, whether or not it needed a second column ----
+  const fullyRevealed = hasSecondColumn ? col2Shown : col1Done;
+  useEffect(() => {
+    if (fullyRevealed) onComplete?.();
+  }, [fullyRevealed, onComplete]);
+
   return (
-    <div ref={availableRef} className="flex h-full items-start justify-center px-[10cqw] pt-[2.3cqw] pb-[10.6cqw]">
+    <div ref={availableRef} className="flex h-full items-start justify-center px-[10cqw] pt-[2.3cqw] pb-[11.5cqw]">
       {/* hidden, fixed-width clone — exists only so every block's real
           rendered height can be measured to decide where column one ends */}
       <div className="pointer-events-none absolute opacity-0" style={{ width: SINGLE_COLUMN_WIDTH, visibility: "hidden" }} aria-hidden>
@@ -139,7 +145,7 @@ export default function MeasuredColumnsPattern({ content, active }: PatternProps
 
       <div className="flex flex-row">
         {/* column one */}
-        <div style={{ width: SINGLE_COLUMN_WIDTH }} className="flex shrink-0 flex-col text-[1.25cqw] leading-[1.77cqw]">
+        <div style={{ width: SINGLE_COLUMN_WIDTH }} className="flex shrink-0 flex-col text-[1.25cqw] leading-[1.8cqw]">
           <div ref={bubbleRef} className="relative">
             <Reveal show={active} index={0}>
               <PromptBubble lines={content.promptLines} />
@@ -174,8 +180,8 @@ export default function MeasuredColumnsPattern({ content, active }: PatternProps
             <div className="w-px shrink-0 self-stretch bg-[#353535]" />
             <div className="shrink-0" style={{ width: `${COLUMN_GAP}cqw` }} />
             <div
-              style={{ width: SINGLE_COLUMN_WIDTH, maxHeight: "37cqw" }}
-              className="flex shrink-0 flex-col overflow-y-auto text-[1.25cqw] leading-[1.77cqw] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              style={{ width: SINGLE_COLUMN_WIDTH, maxHeight: "37cqw", paddingBottom: "11.5cqw" }}
+              className="flex shrink-0 flex-col overflow-y-auto text-[1.25cqw] leading-[1.8cqw] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {col2Blocks.map((b, i) => (
                 <Reveal key={b.id} show={col2Shown} index={i} style={blockGapStyle(b, 1)}>

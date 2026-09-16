@@ -2,6 +2,20 @@ import type { Metadata } from "next";
 import { Geist_Mono, Google_Sans } from "next/font/google";
 import "./globals.css";
 
+// Browsers only honor a <script type="importmap"> that the HTML parser itself inserts —
+// one dynamically appended via document.createElement/appendChild (which is how next/script's
+// beforeInteractive queue actually adds scripts) is rejected. So this one script is rendered
+// as raw markup in a manual <head> instead of going through next/script.
+const MATERIAL_WEB_IMPORTMAP = JSON.stringify({
+  imports: { "@material/web/": "https://esm.run/@material/web/" },
+});
+
+const MATERIAL_WEB_INIT = `
+  import '@material/web/all.js';
+  import { styles as typescaleStyles } from '@material/web/typography/md-typescale-styles.js';
+  document.adoptedStyleSheets.push(typescaleStyles.styleSheet);
+`;
+
 const googleSans = Google_Sans({
   variable: "--font-google-sans",
   subsets: ["latin"],
@@ -24,6 +38,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${googleSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Material 3 web components, loaded from esm.run per the @material/web CDN
+            quick-start rather than an npm install. */}
+        <script type="importmap" dangerouslySetInnerHTML={{ __html: MATERIAL_WEB_IMPORTMAP }} />
+        <script type="module" dangerouslySetInnerHTML={{ __html: MATERIAL_WEB_INIT }} />
+      </head>
       <body className="min-h-full flex flex-col font-sans">{children}</body>
     </html>
   );

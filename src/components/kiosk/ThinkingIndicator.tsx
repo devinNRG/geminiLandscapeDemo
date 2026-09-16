@@ -45,7 +45,7 @@ export default function ThinkingIndicator({ captions }: { captions: string[] }) 
           />
         </div>
       </div>
-      <span className="text-[1.1cqw] text-[#9a9b9c]">{captions[captionIndex]}</span>
+      <span className="text-[1.1cqw] text-muted">{captions[captionIndex]}</span>
     </div>
   );
 }
