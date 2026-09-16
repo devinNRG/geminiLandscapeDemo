@@ -1,4 +1,4 @@
-# Gemini Verizon Kiosk Demo Guidelines
+# Gemini Verizon Kiosk Demo Guideline
 
 ## What this is, and why
 
