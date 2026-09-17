@@ -158,15 +158,27 @@ sitting inside it:
  has fully finished so the two never animate on top of each other, and
  **scrolls** (with the same down-arrow cue used in `ScrollPattern` and
  `GeminiOverlay`) if its share still overflows.
- 3. **Column three** is the way out — the "Back to home" button and the QR
- prompt, moved here from the frame's bottom corners and centered
- vertically against the band the other two columns occupy.
+ 3. **Column three** is the way out — the QR prompt above the "Back to home"
+ button, moved here from the frame's bottom corners, stacked and centered
+ both horizontally and vertically against the band the other two columns
+ occupy. (`QrPrompt` renders code-beside-label in the frame corner and
+ code-above-label here; the corner has no width to spare, the column does.)
 Splits are block-atomic (a heading or bullet is never sliced mid-line —
 real DOM measurement decides where to break, not guesswork).
 
  Two things follow from this that are worth knowing before editing it:
 
- - **The columns are pinned, not centered.** The earlier two-column version
+ - **The column-one budget moves at runtime.** Its bottom padding is the
+ compose box as currently drawn, and the compose box grows and shrinks
+ (expanded while the prompt types, a collapsed pill once the answer
+ starts). Column one's own `clientHeight` is pinned by `h-full`, so a
+ padding change never trips the ResizeObserver — which is why
+ `composeHeight` is an explicit dep of the split effect even though the
+ measuring code never reads it. Without it the split stays frozen at
+ whatever it was measured against, which was the box mid-typing, and
+ column one silently loses a place card's worth of height for the rest of
+ the answer.
+- **The columns are pinned, not centered.** The earlier two-column version
  centered the pair, so column one drifted left as column two opened. It
  can't now: `page.tsx` draws the compose bar and the exit chrome against
  these same column centers, and a frame whose columns slide around
@@ -265,15 +277,13 @@ clicks and generous waits.
 not broken.
 - The "Add yourself" persona has no rundown screen or demo at all yet.
 - Measured Columns' overflow now scrolls in column two rather than being
-quietly capped, so nothing is hidden. What's still open is **balance**: the
-split fills column one to the brim and spills the remainder. With the band
-tour's real content that leaves an obvious hole — the map card and intro
-fill about two thirds of column one, and the next block (a heading plus its
-place card, held together by `keepWithNext`) is too tall to follow them, so
-everything from the first heading on sits in column two. Evening the two
-columns out is a small change to where the split index lands, but it's a
-design call that hasn't been made: the pattern currently does what it has
-always done, which is fill and spill.
+quietly capped, so nothing is hidden, and column one now genuinely fills
+(~88% of its budget on the band tour, the rest being a block that honestly
+doesn't fit). The split is still **fill-and-spill**, not balanced, which
+means a *short* answer leaves column two thin — the weekend answer spills
+only three blocks. That's content length rather than a layout fault, but
+evening the two out is a small change to where the split index lands if it
+ever looks wrong on the floor.
 - Only the band tour answer has been transcribed from Figma. The weekend
 answer is still hand-written content in the older `items` shape, and its
 `promptLines` in `types.ts` are truncated mid-sentence — they don't match

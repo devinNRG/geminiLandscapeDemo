@@ -506,9 +506,11 @@ export function buildContentBlocks(content: ResponseContent, size = 1): ContentB
     });
 
     if (section.place) {
-      // the card is kept with what follows too, so a heading + card pair can't be split off
-      // on its own at the bottom of a column either
-      blocks.push({ id: `${section.id}-place`, isHeading: true, keepWithNext: true, node: <PlaceCardRow place={section.place} size={size} /> });
+      // deliberately NOT keep-with-next: a heading plus its card is a perfectly good way for
+      // a column to end, with the prose carrying on in the next one. Flagging the card too
+      // would mean "heading + card + at least one paragraph, or none of it" — which threw
+      // a whole card's worth of height (11cqw) away every time the paragraph didn't fit.
+      blocks.push({ id: `${section.id}-place`, isHeading: true, node: <PlaceCardRow place={section.place} size={size} /> });
     }
 
     // each paragraph is its own block so a column split can fall between two of them

@@ -151,9 +151,15 @@ export default function MeasuredColumnsPattern({ content, active, onComplete, co
     // a section heading (or a heading + place card) whose content starts in column two
     while (split > 1 && blocks[split - 1]?.keepWithNext) split--;
     setSplitIndex(split);
+    // `composeHeight` has to be a dep even though nothing above reads it directly: it sets
+    // this column's bottom padding, and the column's own clientHeight is pinned by `h-full`,
+    // so a padding change moves the budget without the ResizeObserver ever firing. Left out,
+    // the split stays frozen at whatever it was measured against — which was the compose box
+    // mid-typing, three times taller than the pill it collapses back to, costing column one
+    // a place card's worth of height for the rest of the answer.
     // `blocks` is rebuilt every render but its shape only changes with the content
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columnH, bubbleH, measuredH, blocks.length]);
+  }, [columnH, bubbleH, measuredH, blocks.length, composeHeight]);
 
   // until the first real measurement lands, don't assume "everything fits" —
   // that default would let the reveal timer start (and lock in a block

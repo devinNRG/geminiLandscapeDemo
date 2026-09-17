@@ -142,12 +142,28 @@ function BackHomeButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/** Pairs with the button above — same trigger, and the take-it-with-you half of the ending. */
-function QrPrompt() {
+/**
+ * Pairs with the button above — same trigger, and the take-it-with-you half of the ending.
+ *
+ * Two arrangements, because the two placements want different things: floated into the
+ * frame's bottom-left corner it reads left-to-right, code then label, keeping it short and
+ * out of the answer's way. Standing in column three it's a centered stack instead — it has
+ * a whole column's width to sit in, and a centered stack is what lines up with the
+ * "Back to home" button under it rather than hanging off to one side of it.
+ */
+function QrPrompt({ stacked = false }: { stacked?: boolean }) {
   return (
-    <div className="flex items-center gap-[0.9cqw]">
-      <img src="/gemini/qr-code.jpg" alt="" className="h-[5cqw] w-[5cqw] rounded-[0.5cqw] object-cover" />
-      <span className="max-w-[7cqw] text-[0.95cqw] leading-[1.2cqw] text-muted">Scan to try Gemini on your phone</span>
+    <div className={`flex gap-[0.9cqw] ${stacked ? "flex-col items-center" : "items-center"}`}>
+      <img
+        src="/gemini/qr-code.jpg"
+        alt=""
+        className={`object-cover ${stacked ? "h-[7cqw] w-[7cqw] rounded-[0.7cqw]" : "h-[5cqw] w-[5cqw] rounded-[0.5cqw]"}`}
+      />
+      <span
+        className={`text-[0.95cqw] leading-[1.2cqw] text-muted ${stacked ? "max-w-[13cqw] text-center" : "max-w-[7cqw]"}`}
+      >
+        Scan to try Gemini on your phone
+      </span>
     </div>
   );
 }
@@ -662,8 +678,8 @@ export default function Home() {
               >
                 {/* the entrance animation stays on this inner wrapper — on the box above it
                     would drive `transform` against the centering layout */}
-                <div className="flex flex-col items-center gap-[1.6cqw] [animation:fade-in-up_400ms_ease-out]">
-                  <QrPrompt />
+                <div className="flex flex-col items-center gap-[2cqw] [animation:fade-in-up_400ms_ease-out]">
+                  <QrPrompt stacked />
                   <BackHomeButton onClick={() => setStage("landing")} />
                 </div>
               </div>
