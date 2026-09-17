@@ -173,7 +173,7 @@ function HomeButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="absolute left-6 top-6 z-30 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1.5 pl-3.5 pr-4 text-sm font-medium text-neutral-200 hover:bg-white/10"
+      className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1.5 pl-3.5 pr-4 text-sm font-medium text-neutral-200 hover:bg-white/10"
     >
       <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 11l9-8 9 8" />
@@ -184,52 +184,38 @@ function HomeButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function PatternPicker({ pattern, onChange }: { pattern: PatternId; onChange: (id: PatternId) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const current = PATTERNS.find((p) => p.id === pattern)!;
-
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
-
+/**
+ * Which of the two answer layouts the text demos play in. It reads as a mode you pick and
+ * then run end to end, not as a control you reach for halfway through an answer — so it's
+ * a standing segmented toggle beside the Home button rather than a dropdown that appears
+ * over a response, and choosing the other one restarts at the landing screen instead of
+ * re-rendering the answer already on screen underneath you. Same destination as the Home
+ * button it sits next to, which is what makes the reset read as "start the other demo"
+ * rather than as losing your place.
+ *
+ * Outside the device frame, so hover states are fine here — the no-hover rule is about
+ * what's on the touchscreen.
+ */
+function PatternToggle({ pattern, onChange }: { pattern: PatternId; onChange: (id: PatternId) => void }) {
   return (
-    <div ref={ref} className="absolute right-6 top-6 z-30">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1.5 pl-4 pr-3 text-sm font-medium text-neutral-200 hover:bg-white/10"
-      >
-        {current.label}
-        <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-64 overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 py-1 shadow-xl">
-          {PATTERNS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => {
-                onChange(p.id);
-                setOpen(false);
-              }}
-              className={`flex w-full flex-col items-start gap-0.5 px-4 py-2.5 text-left transition-colors ${
-                p.id === pattern ? "bg-white/10" : "hover:bg-white/5"
-              }`}
-            >
-              <span className="text-sm font-medium text-white">{p.label}</span>
-              <span className="text-xs text-neutral-400">{p.description}</span>
-            </button>
-          ))}
-        </div>
-      )}
+    <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
+      {PATTERNS.map((p) => {
+        const active = p.id === pattern;
+        return (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onChange(p.id)}
+            aria-pressed={active}
+            title={p.description}
+            className={`rounded-full px-3.5 py-1 text-sm font-medium transition-colors ${
+              active ? "bg-white/15 text-white" : "text-neutral-400 hover:text-neutral-200"
+            }`}
+          >
+            {p.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -418,15 +404,27 @@ export default function Home() {
 
   const handleSuggestionTap = () => setStage("typed");
 
+  // Picking the other layout is picking the other demo, so it starts that demo from the top
+  // rather than re-laying-out the answer currently on screen. Without this you can watch a
+  // measured-column answer reflow into a scrolling one mid-sentence, which reads as a bug
+  // in the design rather than as two alternatives being compared.
+  const handlePatternChange = (id: PatternId) => {
+    if (id === pattern) return;
+    setPattern(id);
+    setStage("landing");
+  };
+
   return (
     <div className="relative flex h-screen w-screen flex-col bg-[#1f1f1f]">
-      {/* always available, outside the device frame — jumps back to the persona picker from anywhere */}
-      <HomeButton onClick={() => setStage("landing")} />
-
-      {/* response display pattern — only meaningful once you're actually inside a
-          text-generation demo, not just whenever activeDemo happens to default to one
-          (e.g. still on the landing/rundown screens before any demo has started) */}
-      {showChat && activeDemo in RESPONSE_CONTENT_BY_DEMO && <PatternPicker pattern={pattern} onChange={setPattern} />}
+      {/* demo chrome, outside the device frame: Home jumps back to the persona picker from
+          anywhere, and the toggle beside it picks which answer layout the text demos run in.
+          The toggle stands here permanently rather than appearing over a response — it's the
+          mode you're in, visible before you start and while you're running, not a switch to
+          reach for mid-answer. */}
+      <div className="absolute left-6 top-6 z-30 flex items-center gap-3">
+        <HomeButton onClick={() => setStage("landing")} />
+        <PatternToggle pattern={pattern} onChange={handlePatternChange} />
+      </div>
 
       <div className="flex flex-1 items-center justify-center p-8">
         <div

@@ -53,10 +53,12 @@ only pills wired to a built demo are tappable.
 - **Idle/Typed/Response**: shared kiosk chrome in `page.tsx` — top bar,
 compose bar that morphs from a pill into a typed message box, then the
 answer. Which persona/pill was tapped decides which **demo** plays.
-- **Home button** (top-left, outside the device frame) jumps back to Landing
-from anywhere. It's demo-switcher-adjacent chrome, not part of the kiosk
-screen itself, so it's fine for it to have hover states — nothing *inside*
-the device frame should ever rely on hover (it's a touchscreen).
+- **Demo chrome** (top-left, outside the device frame): the **Home button**
+jumps back to Landing from anywhere, and the **layout toggle** beside it
+picks which of the two answer layouts the text demos run in. Neither is
+part of the kiosk screen itself, so it's fine for them to have hover
+states — nothing *inside* the device frame should ever rely on hover (it's
+a touchscreen).
 
 ## The three built demos
 
@@ -141,9 +143,17 @@ intentionally disabled — only these three actually go anywhere:
    weekend answer's older `items` shape still renders unchanged — the two
    list shapes are alternatives, not a migration.
 
-Weekend and band-tour answers can be viewed through either of two
-**display patterns** (switchable via the picker top-right, itself only shown
-while inside one of those two demos):
+Weekend and band-tour answers play in one of two **display patterns**. These
+are presented as two demos you run end to end, not as a rendering option you
+flip mid-answer: the toggle is a standing segmented control next to the Home
+button (`PatternToggle`), visible before you start and while you're running,
+and picking the other one **restarts at the Landing screen** rather than
+re-laying-out the answer already on screen. It used to be a dropdown that
+appeared top-right over a response, which let you watch an answer reflow
+mid-sentence — that reads as a bug in the design rather than as two
+alternatives being compared. Switching deliberately shares a destination
+with the Home button it sits beside, so the reset reads as "start the other
+demo" rather than as losing your place.
 
 - **Simple scroll** (`patterns/ScrollPattern.tsx`) — single phone-width
 column, scrolls for any content length. No pagination.
