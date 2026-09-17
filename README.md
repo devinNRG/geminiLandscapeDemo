@@ -268,6 +268,15 @@ changed measured height). That means hidden `Reveal` content still
 contributes to layout unless something else (conditional rendering,
 `display:none`) removes it — relevant any time you're measuring height for
 pagination/splitting.
+- **The compose bar is display only.** It shows what the visitor "asked"; it
+isn't how anything is asked. Demos are started by a rundown pill or by a
+thread's own Gemini Intelligence suggestion chip, so the bar itself is
+`pointer-events: none` and only the Send button opts back in. It used to
+carry a click handler that jumped straight into the weekend demo — dead
+once every demo got a real entry point, and worse than dead, since an inert
+pill that still reacts to a tap reads as a broken control on a touchscreen.
+Keeping it inert also stops it swallowing swipes meant for the answer
+scrolling underneath it.
 - **No hover-only affordances inside the kiosk frame** — it's a touchscreen.
 Hover is fine on chrome that lives outside the device (pattern picker, Home
 button).

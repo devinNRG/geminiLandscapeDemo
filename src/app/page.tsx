@@ -564,9 +564,12 @@ export default function Home() {
             </div>
           </div>
 
-          {/* compose — morphs from the idle pill into the typed message box. Hidden during go
-              out's idle moment specifically — the suggestion chip above is that branch's entry
-              point instead, and showing both would leave two competing tap targets on screen */}
+          {/* compose — morphs from the idle pill into the typed message box. Display only: it
+              shows what the visitor "asked", it isn't how anything is asked. Every demo is
+              started by a rundown pill or by a thread's own suggestion chip, so the bar has no
+              tap target of its own beyond Send. Parked below the frame during go out's idle
+              moment, where the suggestion chip is the entry point and a second visible
+              compose field would read as a competing one. */}
           <div
             className="absolute z-20 overflow-hidden rounded-[3.665cqw] bg-surface-raised transition-[height,top,left,transform,opacity] duration-500 ease-in-out"
             style={{
@@ -587,7 +590,11 @@ export default function Home() {
               width: `${COMPOSE_WIDTH_CQW}cqw`,
               height: `${composeHeightCqw}cqw`,
               opacity: showChat ? 1 : 0,
-              pointerEvents: showChat && !composeParked ? "auto" : "none",
+              // The bar is a picture of a compose field, not a working one: nothing in it
+              // starts a demo any more (rundown pills and the in-thread suggestion chip do
+              // that), so it's inert and the Send button below opts back in by itself. That
+              // also stops it swallowing swipes meant for the answer scrolling underneath it.
+              pointerEvents: "none",
             }}
           >
             {/* One continuously-mounted structure rather than two cross-fading overlays, so
@@ -602,26 +609,9 @@ export default function Home() {
                     the outer box expands to fit — growing only as fast as the text actually
                     does, since the text slot below sizes to its own content, never stretched. */}
             <div
-              role={composeExpanded ? undefined : "button"}
-              tabIndex={composeExpanded ? -1 : 0}
-              onClick={composeExpanded ? undefined : () => {
-                setActiveDemo("weekend");
-                setStage("typed");
-              }}
-              onKeyDown={
-                composeExpanded
-                  ? undefined
-                  : (e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        setActiveDemo("weekend");
-                        setStage("typed");
-                      }
-                    }
-              }
               className={`absolute inset-0 flex text-left ${
                 multiLineLatched ? "flex-col justify-start gap-[0.6cqw] px-[2.2cqw] pt-[2.1cqw] pb-[1.3cqw]" : "flex-row items-center gap-[1.65cqw] px-[2.38cqw]"
               }`}
-              style={{ cursor: composeExpanded ? "default" : "pointer" }}
             >
               {!multiLineLatched && <img src="/gemini/icon-plus.svg" alt="" className="h-[2.57cqw] w-[2.57cqw] shrink-0" />}
 
@@ -650,7 +640,7 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={() => setStage("response")}
-                        className="flex h-[4.4cqw] w-[4.4cqw] items-center justify-center rounded-full bg-[#1f3b9b]"
+                        className="pointer-events-auto flex h-[4.4cqw] w-[4.4cqw] items-center justify-center rounded-full bg-[#1f3b9b]"
                       >
                         <img src="/gemini/icon-send.svg" alt="Send" className="h-[1.8cqw] w-[1.8cqw]" />
                       </button>
@@ -670,7 +660,7 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={() => setStage("response")}
-                        className="flex h-[2.62cqw] w-[2.62cqw] items-center justify-center rounded-full bg-[#1f3b9b]"
+                        className="pointer-events-auto flex h-[2.62cqw] w-[2.62cqw] items-center justify-center rounded-full bg-[#1f3b9b]"
                       >
                         <img src="/gemini/icon-send.svg" alt="Send" className="h-[1.3cqw] w-[1.3cqw]" />
                       </button>
