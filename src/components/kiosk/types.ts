@@ -130,6 +130,22 @@ export const WEEKEND_RESPONSE: ResponseContent = {
         ["Friday · Dinner for four at 6.30, ramen with", "Rafael at 9.45"],
         ["Saturday · Morning hike at Runyon Canyon,", "afternoon free"],
         ["Saturday · Table for five at 8, everyone", "together"],
+        ["Sunday · Late breakfast before the first flight", "out at 1.15"],
+      ],
+    },
+    {
+      // the prompt ends "...and put together a packing list", so the answer has to actually
+      // produce one — single-line items, straight from the design file
+      id: "packing",
+      heading: "Packing list",
+      bulleted: true,
+      items: [
+        ["Swimsuits"],
+        ["Trail shoes"],
+        ["One smart shirt"],
+        ["Sunscreen"],
+        ["Refillable water bottle"],
+        ["Light jacket for the evenings"],
       ],
     },
   ],
@@ -517,9 +533,31 @@ export type RundownPill = {
 
 export type RundownData = {
   bgImage: string;
-  /** Oversized-crop technique (matches the landing cards): omit to fall back to plain object-cover. */
-  bgImageWidthPct?: number;
-  bgImageLeftPct?: number;
+  /**
+   * How the backdrop is framed, on top of a plain `object-cover` fit.
+   *
+   * These photos are wide banner crops (930x362) with a large, centred subject going into a
+   * 16:9 frame, so by default the face lands exactly where the centred heading and the
+   * centred pill stack are. Zoom and pan are what move it out from behind them.
+   *
+   * Panning has to be paid for with zoom, in both axes. `object-cover` crops the photo to
+   * this element's own box, so the extra image width a 2.569 photo has over a 1.778 frame is
+   * already thrown away and is *not* available to pan into — what moves is the box. At
+   * `bgZoom` Z the box overhangs the frame by 50 * (Z - 1) cqw each side and
+   * 28.125 * (Z - 1) cqw top and bottom, and that overhang is the entire pan budget:
+   *
+   *     |bgOffsetXCqw| <= 50 * (bgZoom - 1)
+   *     |bgOffsetYCqw| <= 28.125 * (bgZoom - 1)
+   *
+   * Go past either and the black frame shows through at that edge. Negative Y moves the
+   * subject up, negative X moves it left.
+   *
+   * Replaced an earlier width%/left% pair that could only pan horizontally — and that, at
+   * the values it was carrying, worked out to exactly a plain centred cover anyway.
+   */
+  bgZoom?: number;
+  bgOffsetXCqw?: number;
+  bgOffsetYCqw?: number;
   pills: RundownPill[];
 };
 
@@ -527,8 +565,13 @@ export type RundownData = {
 export const RUNDOWNS: Record<string, RundownData> = {
   student: {
     bgImage: "/gemini/personas/student.png",
-    bgImageWidthPct: 144.51,
-    bgImageLeftPct: -22.25,
+    // She sits high and central, so the heading lands straight across her eyes. Nudged down
+    // and right to get the type off them. It can only be a nudge: her face is ~22cqw tall
+    // and the gap between the heading and a five-pill stack is only ~14cqw, so pushing her
+    // far enough down to fully clear the type just buries her chin in the top pill instead.
+    bgZoom: 1.14,
+    bgOffsetXCqw: 5,
+    bgOffsetYCqw: 3.4,
     pills: [
       { id: "study-semester", label: "Plan my study semester" },
       { id: "friday-night", label: "Sort Friday night", active: true },
@@ -539,6 +582,11 @@ export const RUNDOWNS: Record<string, RundownData> = {
   },
   traveler: {
     bgImage: "/gemini/personas/traveler.png",
+    // she sits low and central, so the pill stack lands across her mouth; lifted and pushed
+    // right so her eyes and mouth clear it
+    bgZoom: 1.25,
+    bgOffsetXCqw: 8,
+    bgOffsetYCqw: -6,
     pills: [
       { id: "friends-weekend", label: "Sort the friend’s weekend", active: true },
       { id: "partnerships-vp", label: "Brief me on the partnerships VP" },

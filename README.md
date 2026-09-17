@@ -50,6 +50,16 @@ are tappable — others are greyed out and functionally disabled
 greeting + a bottom-anchored stack of suggestion pills (works for 4 or 5
 pills — the stack grows upward, not down). Same active/disabled pattern:
 only pills wired to a built demo are tappable.
+ The photos are 930x362 banner crops with a large, centred subject going
+ into a 16:9 frame, so by default the face lands exactly where the centred
+ heading and the centred pill stack are. `bgZoom` / `bgOffsetXCqw` /
+ `bgOffsetYCqw` in `RUNDOWNS` zoom and pan the backdrop off that default to
+ move a face clear of them; the pan budget is tied to the zoom (see the
+ doc comment on `RundownData` — exceed it and the black frame shows through
+ at an edge). It only goes so far: a face is taller than the gap between
+ the heading and a five-pill stack, so the traveler clears both but the
+ student is a compromise. A source crop with the subject off-centre would
+ fix that properly.
 - **Idle/Typed/Response**: shared kiosk chrome in `page.tsx` — top bar,
 compose bar that morphs from a pill into a typed message box, then the
 answer. Which persona/pill was tapped decides which **demo** plays.
@@ -73,9 +83,12 @@ task-automation flow). Every other rundown pill across every persona is
 intentionally disabled — only these three actually go anywhere:
 
 1. **Weekend planning** — traveler persona, "Sort the friend's weekend" pill.
-  A normal generated text answer: intro, a doc card, a few sections with
-   bulleted items. Content lives in `types.ts` as `WEEKEND_RESPONSE`
-   (`ResponseContent` shape).
+  A normal generated text answer: intro, then sections of pre-broken
+   `items` (the older list shape). Content lives in `types.ts` as
+   `WEEKEND_RESPONSE` (`ResponseContent` shape). Its tail — the fifth "The
+   weekend" item and the whole "Packing list" section — was transcribed
+   from Figma (`403:4388`); the prompt ends "...and put together a packing
+   list", so the answer has to actually produce one.
 2. **Friday night** — student persona, "Sort Friday night" pill. Branches in
   two: tapping the pill first goes to `FridayNightChoiceScreen.tsx`
    ("How should Friday night go?" — Go out / Stay in, over
@@ -319,10 +332,14 @@ means a *short* answer leaves column two thin — the weekend answer spills
 only three blocks. That's content length rather than a layout fault, but
 evening the two out is a small change to where the split index lands if it
 ever looks wrong on the floor.
-- Only the band tour answer has been transcribed from Figma. The weekend
-answer is still hand-written content in the older `items` shape, and its
-`promptLines` in `types.ts` are truncated mid-sentence — they don't match
-what `page.tsx` types into the compose bar.
+- The weekend answer is still mostly hand-written content in the older
+`items` shape (only its tail came from Figma), and its `promptLines` in
+`types.ts` are truncated mid-sentence — they don't match what `page.tsx`
+types into the compose bar. Worth a pass against the design file, since
+the two gaps found there turned up two more sentences that were missing.
+- The weekend answer's "The weekend" list renders without bullet markers
+(`bulleted: false`) while the design file draws markers on all three of its
+lists. Left as-is rather than changed unasked, but it's a fidelity gap.
 
 ## Deploying
 

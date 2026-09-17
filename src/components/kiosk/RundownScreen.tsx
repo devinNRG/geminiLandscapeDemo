@@ -26,15 +26,16 @@ export default function RundownScreen({
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-black">
+      {/* cover-fitted first, then zoomed and panned off that — see `bgZoom` in types.ts for
+          why the pan budget is tied to the zoom. Scaling about the centre is what keeps a
+          zero-offset photo framed exactly as a plain object-cover would frame it. */}
       <img
         src={data.bgImage}
         alt=""
-        className="pointer-events-none absolute top-0 h-full max-w-none object-cover"
-        style={
-          data.bgImageWidthPct
-            ? { width: `${data.bgImageWidthPct}%`, left: `${data.bgImageLeftPct}%` }
-            : { width: "100%", left: 0 }
-        }
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        style={{
+          transform: `translate(${data.bgOffsetXCqw ?? 0}cqw, ${data.bgOffsetYCqw ?? 0}cqw) scale(${data.bgZoom ?? 1})`,
+        }}
       />
 
       {/* the persona photography is a stand-in here too, same as the landing backdrop */}
