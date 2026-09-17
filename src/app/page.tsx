@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PATTERNS } from "@/components/kiosk/patterns";
-import { LANDING_LAYOUTS } from "@/components/kiosk/landing";
+import GlassPillsLayout from "@/components/kiosk/landing/GlassPillsLayout";
 import {
   BAND_TOUR_RESPONSE,
   FRIDAY_NIGHT_TASK,
   GO_OUT_MESSAGES,
   GO_OUT_SEARCH,
+  GO_OUT_SUGGESTION,
   PERSONAS,
   RUNDOWNS,
   STAY_IN_MESSAGES,
+  STAY_IN_SUGGESTION,
   WEEKEND_RESPONSE,
   type ChatBubble,
+  type MessagesSuggestion,
+  type SushiResult,
   type Persona,
   type PatternId,
-  type LandingLayoutId,
   type ResponseContent,
 } from "@/components/kiosk/types";
 import TypingLines from "@/components/kiosk/TypingLines";
@@ -24,6 +27,14 @@ import FridayNightChoiceScreen from "@/components/kiosk/FridayNightChoiceScreen"
 import TaskAutomationResponse from "@/components/kiosk/TaskAutomationResponse";
 import GoOutResponse from "@/components/kiosk/GoOutResponse";
 import MessagesScene, { MessagesTopBar } from "@/components/kiosk/MessagesScene";
+import { CometRing } from "@/components/kiosk/shared";
+import {
+  COLUMN_BASELINE_CQW,
+  COLUMN_SCALE,
+  COLUMN_TOP_CQW,
+  COLUMN_WIDTH_CQW,
+  columnCenterCqw,
+} from "@/components/kiosk/patterns/columnLayout";
 
 type Stage = "landing" | "rundown" | "fridayNightChoice" | "idle" | "typed" | "response";
 
@@ -49,6 +60,13 @@ const RESPONSE_CONTENT_BY_DEMO: Partial<Record<DemoId, ResponseContent>> = {
 const MESSAGES_BY_DEMO: Partial<Record<DemoId, ChatBubble[]>> = {
   fridayNight: STAY_IN_MESSAGES,
   goOut: GO_OUT_MESSAGES,
+};
+
+// the Gemini Intelligence chip that starts each Friday-night branch, in place of the usual
+// idle "Ask Gemini" pill — both branches open on a thread and are entered by tapping one
+const SUGGESTION_BY_DEMO: Partial<Record<DemoId, MessagesSuggestion>> = {
+  fridayNight: STAY_IN_SUGGESTION,
+  goOut: GO_OUT_SUGGESTION,
 };
 
 const DEFAULT_RUNDOWN_PERSONA = PERSONAS.find((p) => p.id === "traveler")!;
@@ -78,6 +96,11 @@ const PROMPT_LINES_BY_DEMO: Record<DemoId, string[]> = {
 // (pushing the toolbar down within that fixed space) and only start real growth once text
 // exceeds the floor, reading as two different animations instead of one continuous grow.
 const COMPOSE_BOTTOM_CQW = 53.27;
+// the box's width never changes — the expanded multi-line width is also the idle pill's, so
+// the box only ever grows downward, line by line. It used to widen (31.77 -> 35.43) the moment
+// the text outgrew one line, which landed a sideways nudge in the middle of the height growth
+// and read as a second, competing animation.
+const COMPOSE_WIDTH_CQW = 35.43;
 // matches the typed text's own text-[1.4cqw] leading-[1.9cqw] classes
 const COMPOSE_LINE_HEIGHT_CQW = 1.9;
 // the multi-line layout's own padding/gap/toolbar — see the compose box's JSX below; kept as
@@ -88,37 +111,44 @@ const MULTILINE_GAP_CQW = 0.6;
 const MULTILINE_TOOLBAR_ROW_CQW = 2.62; // matches the toolbar row's tallest icon, the Send button (h-[2.62cqw])
 const MULTILINE_PB_CQW = 1.3;
 const CHROME_CQW = MULTILINE_PT_CQW + MULTILINE_GAP_CQW + MULTILINE_TOOLBAR_ROW_CQW + MULTILINE_PB_CQW;
-// pause before any characters appear, once the compose box has taken its bento shape
+// pause before any characters appear, once the compose box is in place
 const TYPING_START_DELAY_MS = 1500;
+// how long the box takes to slide up from below the frame — matches the compose bar's own
+// transition duration. Branches that slide wait this out *before* the pause above starts,
+// so the "hold" is always measured from the box actually being in position, not from the tap.
+const COMPOSE_SLIDE_MS = 500;
 // ms per character — slower than the default so the prompt reads as deliberate, not rushed
 const TYPING_TICK_MS = 45;
 
-// spinning "comet" ring — a conic-gradient trail circling a primed action button (a send
-// button once its text is fully typed, or the "back to home" button as soon as it appears).
-// Plain DOM layering rather than CSS masking (which needs the prefixed and unprefixed
-// mask/mask-composite properties kept in exact sync, and is easy to silently break): an
-// oversized gradient disc behind everything, with an opaque inner disc — matching the
-// button's own fill — painted on top of it to cover the center, leaving only a thin halo
-// visible around the edge. Geometry (inset/radius/position) is inline style rather than
-// Tailwind classes here — this component's classes are the one place in the file that
-// showed up unapplied, so inline CSS sidesteps whatever was eating them. Works on any
-// rounded shape, circle or elongated pill, and must be the FIRST child so the button's
-// label paints after it, not underneath it.
-function CometRing({ coverColor = "#1f3b9b" }: { coverColor?: string }) {
+/**
+ * The shared exit affordance every demo hands off to once its content has played out — a
+ * text answer finished revealing, or FoodOrder was paid — rather than each demo authoring
+ * its own "back" button inside its own content.
+ *
+ * Split out from its placement because it now has two: floated into the frame's corners for
+ * most of the app, and stacked inside column three when the measured-columns frame is up.
+ */
+function BackHomeButton({ onClick }: { onClick: () => void }) {
   return (
-    <span
-      aria-hidden
-      style={{
-        position: "absolute",
-        inset: "-0.35cqw",
-        borderRadius: "9999px",
-        pointerEvents: "none",
-        background: "conic-gradient(from 0deg, transparent 0%, #4c8df6 18%, transparent 45%)",
-        animation: "spin 1.6s linear infinite",
-      }}
-    >
-      <span style={{ position: "absolute", inset: "0.18cqw", borderRadius: "9999px", backgroundColor: coverColor }} />
-    </span>
+    <CometRing active pulse>
+      <button
+        type="button"
+        onClick={onClick}
+        className="rounded-full bg-[#1f3b9b] px-[1.8cqw] py-[1cqw] text-[1.2cqw] font-medium text-white active:bg-[#17307d]"
+      >
+        Back to home
+      </button>
+    </CometRing>
+  );
+}
+
+/** Pairs with the button above — same trigger, and the take-it-with-you half of the ending. */
+function QrPrompt() {
+  return (
+    <div className="flex items-center gap-[0.9cqw]">
+      <img src="/gemini/qr-code.jpg" alt="" className="h-[5cqw] w-[5cqw] rounded-[0.5cqw] object-cover" />
+      <span className="max-w-[7cqw] text-[0.95cqw] leading-[1.2cqw] text-muted">Scan to try Gemini on your phone</span>
+    </div>
   );
 }
 
@@ -188,68 +218,20 @@ function PatternPicker({ pattern, onChange }: { pattern: PatternId; onChange: (i
   );
 }
 
-// duplicated from PatternPicker rather than shared — the two pickers are slated to be
-// unified into one streamlined switcher once more use cases land, so this is deliberately
-// throwaway rather than a shared abstraction worth preserving through that rework.
-function LandingLayoutPicker({ layout, onChange }: { layout: LandingLayoutId; onChange: (id: LandingLayoutId) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const current = LANDING_LAYOUTS.find((l) => l.id === layout)!;
-
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
-
-  return (
-    <div ref={ref} className="absolute right-6 top-6 z-30">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1.5 pl-4 pr-3 text-sm font-medium text-neutral-200 hover:bg-white/10"
-      >
-        {current.label}
-        <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-64 overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 py-1 shadow-xl">
-          {LANDING_LAYOUTS.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              onClick={() => {
-                onChange(l.id);
-                setOpen(false);
-              }}
-              className={`flex w-full flex-col items-start gap-0.5 px-4 py-2.5 text-left transition-colors ${
-                l.id === layout ? "bg-white/10" : "hover:bg-white/5"
-              }`}
-            >
-              <span className="text-sm font-medium text-white">{l.label}</span>
-              <span className="text-xs text-neutral-400">{l.description}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function Home() {
   const [stage, setStage] = useState<Stage>("landing");
   const [pattern, setPattern] = useState<PatternId>("scroll");
-  const [landingLayout, setLandingLayout] = useState<LandingLayoutId>("cards");
   const [rundownPersona, setRundownPersona] = useState<Persona>(DEFAULT_RUNDOWN_PERSONA);
   const [activeDemo, setActiveDemo] = useState<DemoId>("weekend");
   // whichever demo is playing, once its content has fully finished — shows the shared
   // "back to landing" corner button in place of each demo authoring its own exit affordance
   const [demoComplete, setDemoComplete] = useState(false);
+  // Gemini answers *over* the group chat rather than replacing it, so the chat stays up
+  // through the response. Only stay in eventually leaves it, when its task takes the whole
+  // screen; go out never does — it ends by drafting back into the same thread.
+  const [chatVisibleInResponse, setChatVisibleInResponse] = useState(true);
+  // the result picked in go out, appended to the thread as Gemini's drafted plan
+  const [goOutPick, setGoOutPick] = useState<SushiResult | null>(null);
 
   const frameRef = useRef<HTMLDivElement>(null);
   const liveTextRef = useRef<HTMLDivElement>(null);
@@ -282,11 +264,21 @@ export default function Home() {
   const composeExpanded = stage === "typed";
   const showHero = stage === "idle";
   const showResponse = stage === "response";
+  // Only demoComplete is reset here. Per-run chat state (chatVisibleInResponse, goOutPick)
+  // is reset in handleFridayNightChoice instead — an effect lands one render *after*
+  // showResponse flips, and for a single frame `showMessagesScene` would compute false off
+  // the previous run's leftovers. That frame unmounted the thread and the correction
+  // remounted it, replaying the whole conversation from the top the moment you hit send.
   useEffect(() => {
     if (showResponse) setDemoComplete(false);
   }, [showResponse, activeDemo]);
 
-  // the ~1s beat where the box already looks like the idle pill (still showing the "Ask
+  // both Friday-night branches open on a group chat and are entered by tapping its
+  // suggestion chip, so their compose box slides up from below the frame rather than
+  // simply being there — the other demos' boxes are already in place and just fade in
+  const composeSlidesUp = activeDemo === "fridayNight" || activeDemo === "goOut";
+
+  // the beat where the box already looks like the idle pill (still showing the "Ask
   // Gemini" placeholder) before any characters start appearing
   const [hasStartedTyping, setHasStartedTyping] = useState(false);
   useEffect(() => {
@@ -294,9 +286,9 @@ export default function Home() {
       setHasStartedTyping(false);
       return;
     }
-    const t = setTimeout(() => setHasStartedTyping(true), TYPING_START_DELAY_MS);
+    const t = setTimeout(() => setHasStartedTyping(true), TYPING_START_DELAY_MS + (composeSlidesUp ? COMPOSE_SLIDE_MS : 0));
     return () => clearTimeout(t);
-  }, [composeExpanded, activeDemo]);
+  }, [composeExpanded, activeDemo, composeSlidesUp]);
 
   // once the typed text overflows the pill's own (narrower) single-line slot, the box commits
   // to the multi-line layout for the rest of this typing session — latched, not re-checked
@@ -318,12 +310,57 @@ export default function Home() {
   }, [composeExpanded]);
 
   const composeHeightCqw = multiLineLatched ? CHROME_CQW + liveTextHeightCqw : 7.33;
-  const composeWidthCqw = multiLineLatched ? 35.43 : 31.77;
-  // both friday-night branches open on their own scene-setting group chat instead of the generic hero
-  const showMessagesScene = (activeDemo === "fridayNight" || activeDemo === "goOut") && (showHero || composeExpanded);
+
+  // The measured-columns pattern isn't a block of content inside the frame — it's a
+  // three-column frame the whole screen is divided into, and two of those columns are
+  // filled by chrome this file owns rather than by the pattern. So while it's on screen the
+  // compose bar and the exit affordances leave their usual frame-centered / frame-corner
+  // positions and take up their column's slot instead. Geometry comes from columnLayout so
+  // both files are placing things in the same grid.
+  const inColumnFrame = showResponse && pattern === "measuredColumns" && activeDemo in RESPONSE_CONTENT_BY_DEMO;
+  // Scaled, not re-laid-out: the box keeps its authored 35.43cqw width (so its text wraps to
+  // exactly the same lines it did while being typed, and the height measurement above stays
+  // valid) and is simply drawn at the column's scale. 35.43/42 and 23.62/28 are the same
+  // ratio, so it sits in a column exactly as it sat in the full-width layout.
+  const composeScale = inColumnFrame ? COLUMN_SCALE : 1;
+  // what column one has to keep clear beneath its blocks — the box as actually drawn. The
+  // gap below it down to the frame's edge isn't included: that's the floor every column
+  // already stops at (COLUMN_BASELINE_CQW), not something column one reserves for itself.
+  const composeDrawnHeightCqw = composeHeightCqw * composeScale;
+  // Both friday-night branches open on their own group chat instead of the generic hero,
+  // and now stay on it through the response — Gemini's answer floats over the thread
+  // rather than replacing it. Stay in is the only one that eventually leaves.
+  const showMessagesScene =
+    (activeDemo === "fridayNight" || activeDemo === "goOut") &&
+    (showHero || composeExpanded || (showResponse && chatVisibleInResponse));
+
+  // go out's drafted plan, plus the group's answers, appended to the thread once a result
+  // is picked. Memoised because AnimatedThread keys its in-flight timer off this array's
+  // identity — a fresh array each render would restart the message it's mid-way through.
+  const messagesForScene = useMemo(() => {
+    const base = MESSAGES_BY_DEMO[activeDemo] ?? STAY_IN_MESSAGES;
+    // guarded on the demo as well as the pick: the two branches are separate conversations,
+    // so go out's drafted plan must never turn up appended to stay in's thread
+    if (activeDemo !== "goOut" || !goOutPick) return base;
+    return [...base, { kind: "outgoing" as const, text: goOutPick.draftText }, ...GO_OUT_SEARCH.replies];
+  }, [activeDemo, goOutPick]);
+
+  // The messaging app's own RCS field is part of the phone, so it stays put the whole time
+  // the chat is up. Gemini's box doesn't trade places with it — it waits parked below the
+  // frame until the suggestion chip is tapped, then slides up and sits *on top of* it for
+  // the rest of the flow. The RCS field is the wider of the two, so its ends stay visible
+  // either side of Gemini's pill; that overlap is the source design's, not an accident.
+  const composeParked = showMessagesScene && showHero;
+
+  const showMessagesTopBar = showMessagesScene;
+
+  // Stable identities on purpose: the response components hold these in effect dependency
+  // arrays alongside their own timers, so a fresh closure each render would tear down and
+  // restart the timer every render and the sequence would never advance.
+  const handleDemoComplete = useCallback(() => setDemoComplete(true), []);
+  const handleLeaveChat = useCallback(() => setChatVisibleInResponse(false), []);
 
   const ActivePattern = PATTERNS.find((p) => p.id === pattern)!.Component;
-  const ActiveLandingLayout = LANDING_LAYOUTS.find((l) => l.id === landingLayout)!.Component;
 
   // personas with a built rundown screen go there first; "add yourself" (no rundown design yet) skips straight to the blank chat
   const handlePersonaSelect = (persona: Persona) => {
@@ -351,23 +388,19 @@ export default function Home() {
     }
   };
 
+  // both branches open on their group chat, where that thread's own Gemini suggestion chip
+  // (not the usual idle "Ask Gemini" pill) is what actually brings the compose bar up.
+  // This is the only way into either branch, so clearing the pick here is what guarantees
+  // a run always starts from a clean thread — including re-running go out itself, where a
+  // leftover pick would show the drafted plan already in the chat before it was asked for.
   const handleFridayNightChoice = (choice: "goOut" | "stayIn") => {
-    if (choice === "stayIn") {
-      // stay in's prompt is pre-decided, so it skips straight to typing it out
-      setActiveDemo("fridayNight");
-      setStage("typed");
-    } else {
-      // go out opens on the group chat first — the suggestion chip there (not the usual
-      // idle "Ask Gemini" pill) is what actually kicks off the compose bar
-      setActiveDemo("goOut");
-      setStage("idle");
-    }
+    setGoOutPick(null);
+    setChatVisibleInResponse(true);
+    setActiveDemo(choice === "stayIn" ? "fridayNight" : "goOut");
+    setStage("idle");
   };
 
-  const handleGoOutSuggestionTap = () => {
-    setActiveDemo("goOut");
-    setStage("typed");
-  };
+  const handleSuggestionTap = () => setStage("typed");
 
   return (
     <div className="relative flex h-screen w-screen flex-col bg-[#1f1f1f]">
@@ -378,7 +411,6 @@ export default function Home() {
           text-generation demo, not just whenever activeDemo happens to default to one
           (e.g. still on the landing/rundown screens before any demo has started) */}
       {showChat && activeDemo in RESPONSE_CONTENT_BY_DEMO && <PatternPicker pattern={pattern} onChange={setPattern} />}
-      {showLanding && <LandingLayoutPicker layout={landingLayout} onChange={setLandingLayout} />}
 
       <div className="flex flex-1 items-center justify-center p-8">
         <div
@@ -395,7 +427,7 @@ export default function Home() {
             className="absolute inset-0 z-10 transition-opacity duration-500"
             style={{ opacity: showLanding ? 1 : 0, pointerEvents: showLanding ? "auto" : "none" }}
           >
-            <ActiveLandingLayout onSelect={handlePersonaSelect} />
+            <GlassPillsLayout onSelect={handlePersonaSelect} />
           </div>
 
           {/* rundown — the persona's personalized "here's your daily rundown" suggestion screen */}
@@ -422,7 +454,7 @@ export default function Home() {
             {/* top bar — replaced by the Messages app's own header at the start of the
                 friday-night demo, matching how that demo opens on the messaging app rather
                 than on Gemini's own chrome */}
-            {showMessagesScene ? (
+            {showMessagesTopBar ? (
               <MessagesTopBar />
             ) : (
               <div className="px-[2.87cqw] py-[1.88cqw]" />
@@ -448,8 +480,13 @@ export default function Home() {
               <div className="absolute inset-0 transition-opacity duration-500" style={{ opacity: showMessagesScene ? 1 : 0, pointerEvents: "none" }}>
                 <MessagesScene
                   active={showMessagesScene}
-                  messages={MESSAGES_BY_DEMO[activeDemo] ?? STAY_IN_MESSAGES}
-                  suggestion={activeDemo === "goOut" ? { show: showHero, onClick: handleGoOutSuggestionTap } : undefined}
+                  messages={messagesForScene}
+                  suggestion={
+                    SUGGESTION_BY_DEMO[activeDemo]
+                      ? { show: showHero, onClick: handleSuggestionTap, ...SUGGESTION_BY_DEMO[activeDemo]! }
+                      : undefined
+                  }
+                  showComposeBar={showMessagesScene}
                 />
               </div>
 
@@ -458,11 +495,26 @@ export default function Home() {
                   rundown pill was tapped */}
               <div className="absolute inset-0" style={{ opacity: showResponse ? 1 : 0, pointerEvents: showResponse ? "auto" : "none" }}>
                 {activeDemo === "fridayNight" ? (
-                  <TaskAutomationResponse content={FRIDAY_NIGHT_TASK} active={showResponse} onComplete={() => setDemoComplete(true)} />
+                  <TaskAutomationResponse
+                    content={FRIDAY_NIGHT_TASK}
+                    active={showResponse}
+                    onComplete={handleDemoComplete}
+                    onLeaveChat={handleLeaveChat}
+                  />
                 ) : activeDemo === "goOut" ? (
-                  <GoOutResponse content={GO_OUT_SEARCH} active={showResponse} onComplete={() => setDemoComplete(true)} />
+                  <GoOutResponse
+                    content={GO_OUT_SEARCH}
+                    active={showResponse}
+                    onComplete={handleDemoComplete}
+                    onChoose={setGoOutPick}
+                  />
                 ) : (
-                  <ActivePattern content={RESPONSE_CONTENT_BY_DEMO[activeDemo]!} active={showResponse} onComplete={() => setDemoComplete(true)} />
+                  <ActivePattern
+                    content={RESPONSE_CONTENT_BY_DEMO[activeDemo]!}
+                    active={showResponse}
+                    onComplete={handleDemoComplete}
+                    composeHeightCqw={composeDrawnHeightCqw}
+                  />
                 )}
               </div>
             </div>
@@ -472,14 +524,26 @@ export default function Home() {
               out's idle moment specifically — the suggestion chip above is that branch's entry
               point instead, and showing both would leave two competing tap targets on screen */}
           <div
-            className="absolute left-1/2 z-20 overflow-hidden rounded-[3.665cqw] bg-surface-raised transition-[width,height,top,opacity] duration-500 ease-in-out"
+            className="absolute z-20 overflow-hidden rounded-[3.665cqw] bg-surface-raised transition-[height,top,left,transform,opacity] duration-500 ease-in-out"
             style={{
-              transform: "translateX(-50%)",
-              top: `${COMPOSE_BOTTOM_CQW - composeHeightCqw}cqw`,
-              width: `${composeWidthCqw}cqw`,
+              // centered on the frame normally; on column one's center while the
+              // measured-columns frame is up, gliding across on the same 500ms as everything
+              // else this box animates
+              left: inColumnFrame ? `${columnCenterCqw(0)}cqw` : "50%",
+              transform: `translateX(-50%) scale(${composeScale})`,
+              // scaled from its own bottom edge, so the box's resting line stays put at
+              // COMPOSE_BOTTOM_CQW no matter what scale it's drawn at
+              transformOrigin: "50% 100%",
+              // parked clear of the frame's bottom edge while the messaging app owns this
+              // band; the frame's own overflow-hidden clips it there, so handing the band
+              // over just animates `top` back and reads as a slide up into place. Same
+              // property the box later uses to grow upward, but the two never overlap —
+              // the slide finishes long before the first character appears.
+              top: composeParked ? "58cqw" : `${COMPOSE_BOTTOM_CQW - composeHeightCqw}cqw`,
+              width: `${COMPOSE_WIDTH_CQW}cqw`,
               height: `${composeHeightCqw}cqw`,
-              opacity: showChat && !(showHero && activeDemo === "goOut") ? 1 : 0,
-              pointerEvents: showChat && !(showHero && activeDemo === "goOut") ? "auto" : "none",
+              opacity: showChat ? 1 : 0,
+              pointerEvents: showChat && !composeParked ? "auto" : "none",
             }}
           >
             {/* One continuously-mounted structure rather than two cross-fading overlays, so
@@ -538,14 +602,15 @@ export default function Home() {
                 <div className="flex shrink-0 items-center gap-[0.92cqw]">
                   <img src="/gemini/icon-mic.svg" alt="" className="h-[2.57cqw] w-[2.57cqw]" />
                   {hasStartedTyping ? (
-                    <button
-                      type="button"
-                      onClick={() => setStage("response")}
-                      className={`relative flex h-[4.4cqw] w-[4.4cqw] items-center justify-center rounded-full bg-[#1f3b9b] ${typingDone ? "[animation:subtle-pulse_2.2s_ease-in-out_infinite]" : ""}`}
-                    >
-                      {typingDone && <CometRing />}
-                      <img src="/gemini/icon-send.svg" alt="Send" className="relative h-[1.8cqw] w-[1.8cqw]" />
-                    </button>
+                    <CometRing active={typingDone} pulse>
+                      <button
+                        type="button"
+                        onClick={() => setStage("response")}
+                        className="flex h-[4.4cqw] w-[4.4cqw] items-center justify-center rounded-full bg-[#1f3b9b]"
+                      >
+                        <img src="/gemini/icon-send.svg" alt="Send" className="h-[1.8cqw] w-[1.8cqw]" />
+                      </button>
+                    </CometRing>
                   ) : (
                     <div className="flex h-[4.4cqw] w-[4.4cqw] items-center justify-center rounded-full bg-[#192967]">
                       <img src="/gemini/icon-live.svg" alt="" className="h-[2.9cqw] w-[2.9cqw]" />
@@ -557,40 +622,62 @@ export default function Home() {
                   <img src="/gemini/icon-plus.svg" alt="" className="h-[2.57cqw] w-[2.57cqw]" />
                   <div className="flex items-center gap-[1.5cqw]">
                     <img src="/gemini/icon-mic.svg" alt="" className="h-[2.57cqw] w-[2.57cqw]" />
-                    <button
-                      type="button"
-                      onClick={() => setStage("response")}
-                      className={`relative flex h-[2.62cqw] w-[2.62cqw] items-center justify-center rounded-full bg-[#1f3b9b] ${typingDone ? "[animation:subtle-pulse_2.2s_ease-in-out_infinite]" : ""}`}
-                    >
-                      {typingDone && <CometRing />}
-                      <img src="/gemini/icon-send.svg" alt="Send" className="relative h-[1.3cqw] w-[1.3cqw]" />
-                    </button>
+                    <CometRing active={typingDone} pulse>
+                      <button
+                        type="button"
+                        onClick={() => setStage("response")}
+                        className="flex h-[2.62cqw] w-[2.62cqw] items-center justify-center rounded-full bg-[#1f3b9b]"
+                      >
+                        <img src="/gemini/icon-send.svg" alt="Send" className="h-[1.3cqw] w-[1.3cqw]" />
+                      </button>
+                    </CometRing>
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* shared exit affordance for every demo — appears once that demo's content has
-              fully played out (a text answer finished revealing, or FoodOrder was paid),
-              rather than each demo authoring its own "back" button in its own content */}
-          {showResponse && demoComplete && (
-            <button
-              type="button"
-              onClick={() => setStage("landing")}
-              className="absolute bottom-[2.5cqw] right-[2.87cqw] z-20 rounded-full bg-[#1f3b9b] px-[1.8cqw] py-[1cqw] text-[1.2cqw] font-medium text-white [animation:fade-in-up_400ms_ease-out,subtle-pulse_2.2s_ease-in-out_0.4s_infinite] active:bg-[#17307d]"
-            >
-              Back to home
-            </button>
-          )}
-
-          {/* pairs with the back button above — same trigger, opposite corner */}
-          {showResponse && demoComplete && (
-            <div className="absolute bottom-[2.5cqw] left-[2.87cqw] z-20 flex items-center gap-[0.9cqw] [animation:fade-in-up_400ms_ease-out]">
-              <img src="/gemini/qr-code.jpg" alt="" className="h-[5cqw] w-[5cqw] rounded-[0.5cqw] object-cover" />
-              <span className="max-w-[7cqw] text-[0.95cqw] leading-[1.2cqw] text-muted">Scan to try Gemini on your phone</span>
-            </div>
-          )}
+          {/* the demo's ending, in whichever shape the current layout calls for. The entrance
+              animation always lives on a wrapper, never on the button itself: it and the
+              comet ring's pulse both drive `transform`, so on one element the later one
+              simply wins and the other silently does nothing. For the same reason the
+              column-three chrome is positioned by `left`/`top`/`bottom` alone rather than a
+              centering translate — fade-in-up would overwrite that translate mid-entrance. */}
+          {showResponse &&
+            demoComplete &&
+            (inColumnFrame ? (
+              /* column three of the measured-columns frame, which exists for exactly this:
+                 the answer fills columns one and two, and the way out lives in the third.
+                 This box spans the column's whole band — from where column content starts
+                 down to the shared floor — and centers the pair inside it, so the exit sits
+                 level with the middle of the answer rather than hugging its bottom edge. */
+              <div
+                className="absolute z-20 flex flex-col items-center justify-center"
+                style={{
+                  left: `${columnCenterCqw(2) - COLUMN_WIDTH_CQW / 2}cqw`,
+                  width: `${COLUMN_WIDTH_CQW}cqw`,
+                  top: `${COLUMN_TOP_CQW}cqw`,
+                  bottom: `${COLUMN_BASELINE_CQW}cqw`,
+                }}
+              >
+                {/* the entrance animation stays on this inner wrapper — on the box above it
+                    would drive `transform` against the centering layout */}
+                <div className="flex flex-col items-center gap-[1.6cqw] [animation:fade-in-up_400ms_ease-out]">
+                  <QrPrompt />
+                  <BackHomeButton onClick={() => setStage("landing")} />
+                </div>
+              </div>
+            ) : (
+              /* everywhere else — floated into opposite bottom corners of the frame */
+              <>
+                <div className="absolute bottom-[2.5cqw] right-[2.87cqw] z-20 [animation:fade-in-up_400ms_ease-out]">
+                  <BackHomeButton onClick={() => setStage("landing")} />
+                </div>
+                <div className="absolute bottom-[2.5cqw] left-[2.87cqw] z-20 [animation:fade-in-up_400ms_ease-out]">
+                  <QrPrompt />
+                </div>
+              </>
+            ))}
         </div>
       </div>
     </div>

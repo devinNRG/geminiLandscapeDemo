@@ -62,9 +62,9 @@ export default function RundownScreen({
               type="button"
               disabled={!pill.active}
               onClick={() => onSelectPill(pill.id)}
-              className={`flex h-[5.16cqw] items-center rounded-full border px-[2.66cqw] text-left text-[1.5cqw] leading-[1.92cqw] backdrop-blur-xl ${
+              className={`flex h-[5.16cqw] items-center rounded-full border px-[2.66cqw] text-left text-[1.5cqw] leading-[1.92cqw] backdrop-blur-xl transition-transform duration-150 ${
                 pill.active
-                  ? "border-white/15 bg-white/10 text-white active:bg-white/20"
+                  ? "border-white/15 bg-white/10 text-white active:scale-[0.97]"
                   : "pointer-events-none border-white/8 bg-white/4 text-white/40"
               }`}
             >

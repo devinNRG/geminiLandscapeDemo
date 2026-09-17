@@ -5,5 +5,5 @@ import MeasuredColumnsPattern from "./MeasuredColumnsPattern";
 
 export const PATTERNS: { id: PatternId; label: string; description: string; Component: ComponentType<PatternProps> }[] = [
   { id: "scroll", label: "Simple scroll", description: "Phone-width column, scrolls for any length", Component: ScrollPattern },
-  { id: "measuredColumns", label: "Measured columns", description: "Same flow, browser-balanced into two columns", Component: MeasuredColumnsPattern },
+  { id: "measuredColumns", label: "Measured columns", description: "Three columns: answer, overflow, and the way out", Component: MeasuredColumnsPattern },
 ];

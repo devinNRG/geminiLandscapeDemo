@@ -15,6 +15,17 @@ export default function FridayNightChoiceScreen({
 }) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-black">
+      {/* The source is already 16:9 (1.786 against the frame's 1.778), so plain centered
+          cover crops ~3px off the sides and nothing off the top — no focal-point tuning
+          needed here, unlike the 4:3 landing photo. */}
+      <img src="/geminiBackground2.jpg" alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+      {/* Light scrim only: the night scene already carries the heading at ~17:1 unaided.
+          It's weighted to the bottom purely to knock back the headlight trails behind the
+          two buttons, which are the one bright thing in an otherwise dark frame. */}
+      <div
+        className="absolute inset-0"
+        style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.45) 100%)" }}
+      />
       <button
         type="button"
         onClick={onBack}
@@ -32,14 +43,14 @@ export default function FridayNightChoiceScreen({
           <button
             type="button"
             onClick={() => onSelect("goOut")}
-            className="flex h-[5.16cqw] items-center justify-center rounded-full border border-white/15 bg-white/10 text-[1.5cqw] font-medium text-white backdrop-blur-xl active:bg-white/20"
+            className="flex h-[5.16cqw] items-center justify-center rounded-full border border-white/15 bg-white/10 text-[1.5cqw] font-medium text-white backdrop-blur-xl transition-transform duration-150 active:scale-[0.97]"
           >
             Go out
           </button>
           <button
             type="button"
             onClick={() => onSelect("stayIn")}
-            className="flex h-[5.16cqw] items-center justify-center rounded-full border border-white/15 bg-white/10 text-[1.5cqw] font-medium text-white backdrop-blur-xl active:bg-white/20"
+            className="flex h-[5.16cqw] items-center justify-center rounded-full border border-white/15 bg-white/10 text-[1.5cqw] font-medium text-white backdrop-blur-xl transition-transform duration-150 active:scale-[0.97]"
           >
             Stay in
           </button>

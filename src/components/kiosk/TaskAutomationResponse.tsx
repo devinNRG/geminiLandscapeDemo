@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import type { FoodOrderData, TaskDemoContent, TaskStep } from "./types";
-import { PromptBubble, Reveal, useThinkingPhase } from "./shared";
+import { Reveal, useThinkingPhase } from "./shared";
 import ThinkingIndicator from "./ThinkingIndicator";
+import GeminiOverlay from "./GeminiOverlay";
 
 const SINGLE_COLUMN_WIDTH = "42cqw";
 // how long each auto-advancing task step stays up before the next one takes over
@@ -25,10 +26,14 @@ export default function TaskAutomationResponse({
   content,
   active,
   onComplete,
+  onLeaveChat,
 }: {
   content: TaskDemoContent;
   active: boolean;
   onComplete?: () => void;
+  /** Fires when the flow moves past its first card — the point where it stops being an
+   * overlay on the group chat and takes over the whole screen. */
+  onLeaveChat?: () => void;
 }) {
   const { showThinking, contentShown } = useThinkingPhase(active);
 
@@ -48,52 +53,55 @@ export default function TaskAutomationResponse({
 
   useEffect(() => {
     if (!contentShown || lastStep) return;
-    const t = setTimeout(() => setStepIndex((i) => i + 1), STEP_HOLD_MS);
+    const t = setTimeout(() => {
+      setStepIndex((i) => i + 1);
+      // fired from the timer rather than synchronously in the effect body, so notifying the
+      // parent doesn't add a cascading-render warning. Idempotent — safe to re-fire per step.
+      onLeaveChat?.();
+    }, STEP_HOLD_MS);
     return () => clearTimeout(t);
     // stepIndex itself must be a dep (not just the derived lastStep) or the effect won't reschedule between steps
-  }, [contentShown, lastStep, stepIndex]);
+  }, [contentShown, lastStep, stepIndex, onLeaveChat]);
 
   const step = content.steps[stepIndex];
+
+  // The first card plays as an overlay on top of the still-visible group chat — Gemini
+  // answering in place. Everything after it is the task running on its own, so the chat
+  // (and the overlay) drop away and the notification takes the whole screen.
+  if (!showApp && stepIndex === 0) {
+    return (
+      <GeminiOverlay show={active}>
+        {/* No prompt bubble here, matching the go out overlay: the typed prompt is already
+            sitting in the compose bar right below, so repeating it inside the panel just
+            says the same thing twice in the same eyeful. */}
+        {showThinking ? (
+          <Reveal show={active} index={0}>
+            <ThinkingIndicator captions={THINKING_CAPTIONS} />
+          </Reveal>
+        ) : (
+          <div className="flex flex-col text-[1.25cqw] leading-[1.8cqw]">
+            <Reveal show={contentShown} index={0}>
+              <p className="text-white">{content.introText}</p>
+            </Reveal>
+            <Reveal show={contentShown} index={1} style={{ marginTop: "0.9cqw" }}>
+              <WorkingCard step={step} />
+            </Reveal>
+          </div>
+        )}
+      </GeminiOverlay>
+    );
+  }
 
   return (
     <div className="flex h-full items-start justify-center px-[10cqw] pt-[2.3cqw] pb-[10.6cqw]">
       <div className="flex flex-col text-[1.25cqw] leading-[1.8cqw]" style={{ width: SINGLE_COLUMN_WIDTH }}>
-        {/* the prompt bubble disappears once FoodOrder opens — its job (showing what was
-            asked) is done, and the checkout card needs the room to fit without overlap */}
-        {!showApp && (
-          <div className="relative">
-            <Reveal show={active} index={0}>
-              <PromptBubble lines={content.promptLines} />
-            </Reveal>
-            {showThinking && (
-              <div className="absolute left-0" style={{ top: "calc(100% + 1.3cqw)" }}>
-                <Reveal show={active} index={0.5}>
-                  <ThinkingIndicator captions={THINKING_CAPTIONS} />
-                </Reveal>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* the task card hands off to the FoodOrder card rather than stacking under it —
             matching the source design (the checkout screen replaces the notification
             entirely) and keeping total height well inside the frame */}
         {!showApp ? (
-          stepIndex === 0 ? (
-            <>
-              <Reveal show={contentShown} index={1} style={{ marginTop: "1.3cqw" }}>
-                <p className="text-white">{content.introText}</p>
-              </Reveal>
-
-              <Reveal show={contentShown} index={2} style={{ marginTop: "0.9cqw" }}>
-                <WorkingCard step={step} />
-              </Reveal>
-            </>
-          ) : (
-            <div className="mt-[1.3cqw] [animation:fade-in-up_500ms_ease-out]">
-              <NotificationCard step={step} showCta={lastStep} onOpenApp={() => setShowApp(true)} />
-            </div>
-          )
+          <div className="mt-[1.3cqw] [animation:fade-in-up_500ms_ease-out]">
+            <NotificationCard step={step} showCta={lastStep} onOpenApp={() => setShowApp(true)} />
+          </div>
         ) : (
           <div className="[animation:fade-in-up_500ms_ease-out]">
             <FoodOrderCard data={content.foodOrder} paid={paid} onPay={() => setPaid(true)} onComplete={onComplete} />

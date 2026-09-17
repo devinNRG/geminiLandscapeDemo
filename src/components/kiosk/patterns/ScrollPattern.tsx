@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { PatternProps } from "../types";
-import { ContinuousFlow } from "../shared";
+import { ContinuousFlow, ScrollCue, useScrollCue } from "../shared";
 
 // distance from the frame's bottom edge to the resting (idle) compose bubble's top edge
 // is 56.25 - 45.94 = 10.31cqw (frame height 56.25cqw at 16:9, bubble top pinned to 45.94cqw
@@ -25,25 +25,7 @@ const BOTTOM_CLEARANCE_CQW = 11.5;
 export default function ScrollPattern({ content, active, onComplete }: PatternProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
-  const [hasMore, setHasMore] = useState(false);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    const inner = innerRef.current;
-    if (!el || !inner) return;
-
-    const check = () => setHasMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
-
-    check();
-    el.addEventListener("scroll", check);
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    ro.observe(inner);
-    return () => {
-      el.removeEventListener("scroll", check);
-      ro.disconnect();
-    };
-  }, []);
+  const { hasMore, scrollForward } = useScrollCue(scrollRef, innerRef);
 
   // start each new answer scrolled to the top rather than wherever the previous one left off
   useEffect(() => {
@@ -62,22 +44,9 @@ export default function ScrollPattern({ content, active, onComplete }: PatternPr
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => {
-          const el = scrollRef.current;
-          if (!el) return;
-          el.scrollBy({ top: el.clientHeight * 0.7, behavior: "smooth" });
-        }}
-        aria-label="Scroll for more"
-        tabIndex={hasMore ? 0 : -1}
-        className="absolute left-1/2 z-10 flex h-[3.6cqw] w-[3.6cqw] -translate-x-1/2 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition-opacity duration-300"
-        style={{ bottom: `${CUE_BOTTOM_CQW}cqw`, opacity: hasMore ? 1 : 0, pointerEvents: hasMore ? "auto" : "none" }}
-      >
-        <svg viewBox="0 0 24 24" className="h-[1.6cqw] w-[1.6cqw]" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
+      <div className="absolute left-1/2 z-10 -translate-x-1/2" style={{ bottom: `${CUE_BOTTOM_CQW}cqw` }}>
+        <ScrollCue show={active && hasMore} onClick={scrollForward} size={3.6} className="border-white/10 bg-white/5" />
+      </div>
     </div>
   );
 }

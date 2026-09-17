@@ -154,6 +154,49 @@ body {
   }
 }
 
+/*
+ * The comet ring's sweep angle. Registered via @property so it can be
+ * *animated*: an unregistered custom property is an untyped token, which the
+ * browser can only swap discretely (0deg straight to 360deg, one jump per
+ * cycle) — registering it as an <angle> is what makes the sweep interpolate
+ * smoothly.
+ *
+ * Animating this angle, rather than spinning the ring element itself, is what
+ * lets one ring serve every button. Rotating the element only ever looked
+ * right on a square (a rotated square with a 50% radius is still a circle);
+ * on a wide pill it swung the whole rounded rectangle around its center,
+ * which is the "spinning rectangle" earlier attempts kept producing. With the
+ * element held still and only the gradient sweeping, the trail tracks
+ * whatever border box it's handed, at any size or aspect ratio.
+ */
+@property --comet-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes comet-sweep {
+  to {
+    --comet-angle: 360deg;
+  }
+}
+
+/* the three dots in a chat "someone is typing" bubble — a plain staggered bounce,
+   deliberately much simpler than Gemini's own thinking-dot choreography above, since
+   this one is imitating a stock messaging app rather than Gemini */
+@keyframes chat-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-0.35cqw);
+    opacity: 1;
+  }
+}
+
 /* gentle "tap here" attention cue for a primed submit/CTA button — a soft
    scale + glow breathe, not a hard blink, so it draws the eye without nagging */
 @keyframes subtle-pulse {
