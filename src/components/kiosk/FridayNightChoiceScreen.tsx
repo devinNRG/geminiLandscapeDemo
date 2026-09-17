@@ -1,5 +1,7 @@
 "use client";
 
+import { FpoChip } from "./shared";
+
 /**
  * Sits between picking the "Sort Friday night" pill and playing a demo — the
  * use case branches into two: "Go out" (a local-search flow — nearby sushi
@@ -26,6 +28,8 @@ export default function FridayNightChoiceScreen({
         className="absolute inset-0"
         style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.45) 100%)" }}
       />
+      <FpoChip />
+
       <button
         type="button"
         onClick={onBack}

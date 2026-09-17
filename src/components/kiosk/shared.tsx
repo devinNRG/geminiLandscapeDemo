@@ -172,6 +172,26 @@ export function ScrollCue({
   );
 }
 
+/**
+ * "For position only" — marks a screen whose full-bleed backdrop is a stand-in whose rights
+ * aren't settled, so a screenshot of it can't circulate as if the photo were signed off.
+ * Every screen carrying one of those backdrops gets one; retire the chip (not the photo)
+ * once that image is cleared.
+ *
+ * `pointer-events-none` is deliberate: it's a margin note, not a control, and nothing inside
+ * the kiosk frame is allowed to look tappable without being tappable. Positioned against the
+ * frame's own chrome inset so it lands in the same spot on every screen, and it carries its
+ * own scrim + blur because it has to stay legible over whatever the photo happens to be
+ * doing behind it.
+ */
+export function FpoChip() {
+  return (
+    <span className="pointer-events-none absolute right-[2.87cqw] top-[2.87cqw] z-10 rounded-full border border-white/25 bg-black/40 px-[0.95cqw] py-[0.38cqw] text-[0.85cqw] font-medium tracking-[0.1em] text-white/85 backdrop-blur-md">
+      FPO
+    </span>
+  );
+}
+
 /** Fades + lifts its children in once `show` flips true, staggered by `index`. */
 export function Reveal({
   show,

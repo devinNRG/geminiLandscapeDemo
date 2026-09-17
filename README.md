@@ -274,6 +274,16 @@ button).
 - **Inactive content is visibly disabled, never silently missing.** Personas
 and pills not yet wired to a demo are greyed out *and* have `disabled` set
 — never just absent from the DOM.
+- **Unsigned-off imagery is marked, not quietly used.** Every screen with a
+full-bleed stand-in photo behind it carries an `FpoChip` (`shared.tsx`) in
+the top-right — Landing, Rundown and the Friday-night choice screen — so a
+screenshot can't circulate as if the photo were cleared. It's one shared
+component rather than per-screen markup, so the chip lands in the same
+place on all of them. Retire the chip, not the photo, once an image is
+signed off. (The band-tour place photos and map still come from the Figma
+file and are *not* marked — they sit inside the answer rather than behind
+it, so a per-screen chip doesn't apply; worth a decision if their rights
+are also unsettled.)
 - **Don't hardcode per-demo pixel/cqw constants you'll have to re-tune by
 hand.** The compose box's expanded height, for example, is computed at
 runtime from a hidden measurement clone of each demo's actual prompt text

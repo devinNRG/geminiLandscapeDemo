@@ -1,6 +1,7 @@
 "use client";
 
 import { RUNDOWNS, type Persona } from "./types";
+import { FpoChip } from "./shared";
 
 /**
  * The personalized "Hi, here's your daily rundown" screen shown right after
@@ -35,6 +36,9 @@ export default function RundownScreen({
             : { width: "100%", left: 0 }
         }
       />
+
+      {/* the persona photography is a stand-in here too, same as the landing backdrop */}
+      <FpoChip />
 
       <button
         type="button"

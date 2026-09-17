@@ -1,6 +1,7 @@
 "use client";
 
 import { PERSONAS, type Persona } from "../types";
+import { FpoChip } from "../shared";
 
 /**
  * The persona picker — now the only landing layout (the earlier full-height
@@ -45,13 +46,7 @@ export default function GlassPillsLayout({ onSelect }: { onSelect: (persona: Per
         }}
       />
 
-      {/* Marks the backdrop's rights status, so a screenshot of this screen can't circulate
-          as if the photo were settled. `pointer-events-none` is deliberate: it's a margin
-          note, not a control, and nothing inside this frame is allowed to look tappable
-          without being tappable. Retire it (not the photo) once the image is cleared. */}
-      <span className="pointer-events-none absolute right-[2.87cqw] top-[2.87cqw] z-10 rounded-full border border-white/25 bg-black/40 px-[0.95cqw] py-[0.38cqw] text-[0.85cqw] font-medium tracking-[0.1em] text-white/85 backdrop-blur-md">
-        FPO
-      </span>
+      <FpoChip />
 
       <p className="relative z-10 pointer-events-none pt-[5.63cqw] text-center text-[2.9cqw] text-white">
         Who&rsquo;s starting their day?
