@@ -53,12 +53,17 @@ only pills wired to a built demo are tappable.
 - **Idle/Typed/Response**: shared kiosk chrome in `page.tsx` — top bar,
 compose bar that morphs from a pill into a typed message box, then the
 answer. Which persona/pill was tapped decides which **demo** plays.
-- **Demo chrome** (top-left, outside the device frame): the **Home button**
-jumps back to Landing from anywhere, and the **layout toggle** beside it
-picks which of the two answer layouts the text demos run in. Neither is
-part of the kiosk screen itself, so it's fine for them to have hover
-states — nothing *inside* the device frame should ever rely on hover (it's
-a touchscreen).
+- **Demo control bar** (`DemoControlBar`) — a band *above* the kiosk, not
+floating over it: **Home** on the left (jumps back to Landing from
+anywhere), the **layout toggle** on the right, and a "Demo controls" label
+between them on the left. It's a lighter surface with a rule under it
+because the thing below is a mockup of a product, and controls floating in
+the corners over that stage left it ambiguous which of the two you were
+looking at. Nothing in this bar is part of the kiosk, which is why it's
+allowed hover states and ordinary app-sized type (px, not cqw) — whereas
+nothing *inside* the device frame may rely on hover (it's a touchscreen).
+The frame sizes itself against the remaining height (`100vh - 7.5rem`:
+the bar plus the stage's own padding).
 
 ## The three built demos
 
@@ -145,15 +150,16 @@ intentionally disabled — only these three actually go anywhere:
 
 Weekend and band-tour answers play in one of two **display patterns**. These
 are presented as two demos you run end to end, not as a rendering option you
-flip mid-answer: the toggle is a standing segmented control next to the Home
-button (`PatternToggle`), visible before you start and while you're running,
-and picking the other one **restarts at the Landing screen** rather than
+flip mid-answer: the toggle is a standing segmented control in the demo
+control bar (`PatternToggle`, top right), visible before you start and while
+you're running, and picking the other one **restarts at the Landing screen**
+rather than
 re-laying-out the answer already on screen. It used to be a dropdown that
 appeared top-right over a response, which let you watch an answer reflow
 mid-sentence — that reads as a bug in the design rather than as two
 alternatives being compared. Switching deliberately shares a destination
-with the Home button it sits beside, so the reset reads as "start the other
-demo" rather than as losing your place.
+with the Home button at the other end of the same bar, so the reset reads as
+"start the other demo" rather than as losing your place.
 
 - **Simple scroll** (`patterns/ScrollPattern.tsx`) — single phone-width
 column, scrolls for any content length. No pagination.

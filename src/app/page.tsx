@@ -220,6 +220,41 @@ function PatternToggle({ pattern, onChange }: { pattern: PatternId; onChange: (i
   );
 }
 
+/**
+ * The strip above the kiosk holding everything that drives the demo but is not part of it:
+ * the Home button and the layout toggle. They used to float in the corners *over* the
+ * stage, which left it ambiguous whether they were chrome or part of the product being
+ * shown — a fair question to have when the thing on screen is a mockup of a kiosk UI.
+ *
+ * So they get their own band: a lighter surface than the stage below it, a rule under it,
+ * and a label saying what it is. Everything in here is allowed hover states and ordinary
+ * app-sized type (px, not cqw) precisely because it is *not* the kiosk — the 16:9 frame
+ * below is the only thing pretending to be a product.
+ */
+function DemoControlBar({
+  pattern,
+  onPatternChange,
+  onHome,
+}: {
+  pattern: PatternId;
+  onPatternChange: (id: PatternId) => void;
+  onHome: () => void;
+}) {
+  return (
+    <div className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-[#2a2a2c] px-6">
+      <div className="flex items-center gap-3">
+        <span className="flex items-center gap-2 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+          <span className="h-1.5 w-1.5 rounded-full bg-neutral-500" />
+          Demo controls
+        </span>
+        <span className="h-5 w-px bg-white/10" />
+        <HomeButton onClick={onHome} />
+      </div>
+      <PatternToggle pattern={pattern} onChange={onPatternChange} />
+    </div>
+  );
+}
+
 export default function Home() {
   const [stage, setStage] = useState<Stage>("landing");
   const [pattern, setPattern] = useState<PatternId>("scroll");
@@ -415,24 +450,19 @@ export default function Home() {
   };
 
   return (
-    <div className="relative flex h-screen w-screen flex-col bg-[#1f1f1f]">
-      {/* demo chrome, outside the device frame: Home jumps back to the persona picker from
-          anywhere, and the toggle beside it picks which answer layout the text demos run in.
-          The toggle stands here permanently rather than appearing over a response — it's the
-          mode you're in, visible before you start and while you're running, not a switch to
-          reach for mid-answer. */}
-      <div className="absolute left-6 top-6 z-30 flex items-center gap-3">
-        <HomeButton onClick={() => setStage("landing")} />
-        <PatternToggle pattern={pattern} onChange={handlePatternChange} />
-      </div>
+    <div className="flex h-screen w-screen flex-col bg-[#1f1f1f]">
+      <DemoControlBar pattern={pattern} onPatternChange={handlePatternChange} onHome={() => setStage("landing")} />
 
-      <div className="flex flex-1 items-center justify-center p-8">
+      <div className="flex min-h-0 flex-1 items-center justify-center p-8">
         <div
           ref={frameRef}
           className="@container relative flex flex-col overflow-hidden rounded-[2.5cqw] border-[0.35cqw] border-black bg-black"
           style={{
             aspectRatio: "16 / 9",
-            width: "min(100%, calc((100vh - 9rem) * 16 / 9))",
+            // the control bar (h-14 = 3.5rem) plus this row's own p-8 (2rem top and bottom).
+            // It used to subtract 9rem, most of which was slack for the Home button floating
+            // over the stage — now that the chrome has its own band, that slack is frame.
+            width: "min(100%, calc((100vh - 7.5rem) * 16 / 9))",
             maxHeight: "100%",
           }}
         >
