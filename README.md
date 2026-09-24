@@ -106,8 +106,8 @@ intentionally disabled — only these three actually go anywhere:
   group chat** (`GeminiOverlay.tsx`) rather than replacing it — the thread
   stays visible above and behind the panel, which is bottom-anchored just
   clear of the compose pill and grows upward with its content. Long answers
-  scroll inside it; nothing auto-scrolls, so a down-arrow cue (same one
-  `ScrollPattern` uses) is what tells a visitor there's more below.
+  scroll inside it; nothing auto-scrolls, so a rising-dots cue (`RisingDotsCue`,
+  shared with every scrolling surface) is what tells a visitor there's more below.
   The thread itself plays **message by message** (`AnimatedThread` in
   `MessagesScene.tsx`): the user's own message types character by character,
   while each incoming one shows a typing indicator before its bubble lands.
@@ -185,9 +185,9 @@ sitting inside it:
  the frame.
  2. **Column two** takes whatever didn't fit, revealing only once column one
  has fully finished so the two never animate on top of each other, and
- **scrolls** (with the same down-arrow cue used in `ScrollPattern` and
+ **scrolls** (with the same rising-dots cue used in `ScrollPattern` and
  `GeminiOverlay`) if its share still overflows.
- 3. **Column three** is the way out — the QR prompt above the "Back to home"
+ 3. **Column three** is the way out — the QR prompt above the "Back to your rundown"
  button, moved here from the frame's bottom corners, stacked and centered
  both horizontally and vertically against the band the other two columns
  occupy. (`QrPrompt` renders code-beside-label in the frame corner and

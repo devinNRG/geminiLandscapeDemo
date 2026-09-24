@@ -9,8 +9,12 @@
 /** Bolded lead-in on a bulleted fact, e.g. "Getting there:" — shared with the
  * "go out" search results, which bullet the same way. */
 export type PlaceBullet = {
-  label: string;
+  /** Bold lead-in; a bullet without one is a plain sentence. */
+  label?: string;
+  /** Can be empty when the bullet is only a label heading its `children`. */
   text: string;
+  /** Sub-bullets, indented one level under this one (the band tour's timed schedule). */
+  children?: PlaceBullet[];
 };
 
 /**
@@ -22,17 +26,21 @@ export type PlaceBullet = {
  */
 export type PlaceCard = {
   name: string;
-  rating: string;
-  /** Review count and price band, dimmed after the star, e.g. "· (1.2K)" or "· (860) · $140 a night" */
-  meta: string;
-  address: string;
-  /** Green lead-in on the status row, e.g. "Fri · load-in 5 PM", "Check-in 3 PM", "Open late" */
-  status: string;
-  /** Dimmed tail after the status, e.g. "· doors 7 PM" */
-  statusTail: string;
-  /** Last dimmed row — a travel time or walking distance, e.g. "2 h 10 from LA" */
-  note: string;
   image: string;
+  /** Every row below the name is optional — the design draws a place (a city) with its
+   * name alone, a hotel with a rating and a category, a restaurant with its hours. */
+  rating?: string;
+  /** Review count and price band, dimmed after the star, e.g. "· (1.2K)" or "· (860) · $140 a night" */
+  meta?: string;
+  address?: string;
+  /** Coloured lead-in on the status row, e.g. "Hotel", "Open", "Closed" */
+  status?: string;
+  /** Green for open/available (the default), a soft red for closed. */
+  statusTone?: "open" | "closed";
+  /** Dimmed tail after the status, e.g. "· Opens 11:00 AM" */
+  statusTail?: string;
+  /** Last dimmed row — a travel time or walking distance, e.g. "2 h 10 from LA" */
+  note?: string;
 };
 
 export type Section = {
@@ -46,6 +54,8 @@ export type Section = {
   /** Bulleted facts with a bold lead-in label. Wraps naturally: unlike `items` below
    * these are authored as whole sentences, not as pre-broken display lines. */
   bullets?: PlaceBullet[];
+  /** Number `bullets` 1, 2, 3… instead of marking them — a checklist rather than a list. */
+  numbered?: boolean;
   /** Whether `items` renders with bullet markers. Only meaningful alongside `items`. */
   bulleted?: boolean;
   /** Pre-broken structured items — each entry is a list of display lines, so wrapping
@@ -59,32 +69,36 @@ export type ResponseContent = {
   /** Optional lead card above the intro — the band tour answer opens on a map pinning
    * both venues, before any prose. */
   map?: MapCard;
-  introLines: string[];
+  /** Optional — the band tour answer goes straight from its map into its first section. */
+  introLines?: string[];
+  /** Section headings in regular weight rather than bold — the newer design files draw
+   * them that way; the older weekend answer keeps its bold. */
+  plainHeadings?: boolean;
   sections: Section[];
   /** Optional wrap-up after the last section. */
   closingLines?: string[];
 };
 
-/** The Google-Maps card at the head of an answer. `pins` are placed as fractions of the
- * map's own box (0–1 from its top-left), so the card can be drawn at any width. */
+/** A Google Maps still with pins (and optionally a route) drawn over it. Pins and route
+ * points are fractions of the map's own box (0–1 from its top-left; a pin at its head's
+ * centre), so the card can be drawn at any width. */
 export type MapCard = {
   image: string;
-  /** Vector overlay drawn over the ground image — roads and labels, exported separately. */
-  overlay: string;
-  /** Width / height of the card as designed, so it scales without being re-measured. */
+  /** Width / height of the card, so it scales without being re-measured. */
   aspectRatio: number;
   pins: MapPin[];
+  /** Pin fill — Google's amber for food, its blue for everything else (the default). */
+  pinColor?: string;
+  /** A drive drawn as a blue line through these points, in order. */
+  route?: [number, number][];
 };
 
 export type MapPin = {
   label: string;
-  /** 0–1 across the map's width / height. */
   x: number;
   y: number;
   /** Which side of the pin the label chip hangs off, so two chips never collide. */
   side: "left" | "right";
-  /** Whether the chip sits above or below its pin. */
-  vAlign: "above" | "below";
 };
 
 export const WEEKEND_RESPONSE: ResponseContent = {
@@ -153,118 +167,112 @@ export const WEEKEND_RESPONSE: ResponseContent = {
 
 export const BAND_TOUR_RESPONSE: ResponseContent = {
   promptLines: [
-    "Plan The Tuesday Club\u2019s tour.",
-    "Two gigs: Friday the 26th at The Copper Owl in San Diego and Saturday the 27th at The Marlin Room.",
-    "Build the three days around them: travel timings to make both gigs, a hotel near the venue, and places to eat.",
+    "The band is playing a show Friday night in Austin and Saturday night in Dallas. Help plan the trip, including hotel suggestions, places to eat, and travel timing with the van.",
   ],
+  // pins and route traced off the design: a pin sits at its head's centre, and the route
+  // runs I-35 from Austin up through Waco into Dallas
   map: {
-    image: "/gemini/band-tour/map-venues.png",
-    overlay: "/gemini/band-tour/map-overlay.svg",
-    aspectRatio: 666.17 / 316.66,
+    image: "/v81-image-assets-inuse/assets/map-texas-tour-wide.jpg",
+    aspectRatio: 2,
     pins: [
-      { label: "The Marlin Room", x: 0.389, y: 0.127, side: "right", vAlign: "below" },
-      { label: "The Copper Owl", x: 0.722, y: 0.857, side: "left", vAlign: "above" },
+      { label: "The Elm Street Hotel", x: 0.54, y: 0.202, side: "right" },
+      { label: "South Congress Motor Inn", x: 0.463, y: 0.674, side: "right" },
+    ],
+    route: [
+      [0.462, 0.735],
+      [0.463, 0.683],
+      [0.48, 0.61],
+      [0.495, 0.574],
+      [0.505, 0.538],
+      [0.512, 0.502],
+      [0.514, 0.465],
+      [0.514, 0.429],
+      [0.522, 0.393],
+      [0.534, 0.356],
+      [0.537, 0.32],
+      [0.538, 0.248],
+      [0.536, 0.225],
     ],
   },
-  introLines: [
-    "Here is a three day plan for The Tuesday Club around both gigs: drive times, a hotel by the venue, where to eat after each show, and home on Sunday.",
-  ],
+  plainHeadings: true,
   sections: [
     {
-      id: "copper-owl",
-      heading: "The Copper Owl \u00b7 Friday",
-      place: {
-        name: "The Copper Owl",
-        rating: "4.6",
-        meta: "\u00b7 (1.2K)",
-        address: "Gaslamp Quarter, San Diego",
-        status: "Fri \u00b7 load-in 5 PM",
-        statusTail: "\u00b7 doors 7 PM",
-        note: "2 h 10 from LA",
-        image: "/gemini/band-tour/place-copper-owl.png",
-      },
-      body: [
-        "The Copper Owl is a 400 capacity room off Fifth Avenue in the Gaslamp Quarter, with a house backline and an in-house engineer from five.",
-        "It fits the first night: the drive down lands the van with time to spare, and the load-in is early enough to sound check without rushing the set.",
-      ],
+      id: "van-travel",
+      heading: "Van Travel Timing & Route Logistics",
+      place: { name: "Austin", image: "/v81-image-assets-inuse/assets/tour-austin.jpg" },
       bullets: [
-        { label: "Getting there:", text: "I-405 to I-5, about 2 h 10 with the trailer, so leave LA by 2.00 to make the 5 PM load-in." },
-        { label: "The room:", text: "400 capacity, house backline available, in-house engineer from 5.00 and doors at 7." },
-        { label: "Good to know:", text: "Load in at the back entrance on Island Ave; the stage manager is Dana." },
+        { label: "Route:", text: "Austin to Dallas via I-35 North." },
+        { label: "Standard Drive Time:", text: "3 hours, 15 minutes (195 miles)." },
+        {
+          label: "Touring Buffer Schedule:",
+          text: "",
+          children: [
+            { label: "11:00 AM:", text: "Load out / depart Austin to clear central Austin traffic." },
+            { label: "12:45 PM \u2013 1:30 PM:", text: "Midpoint fuel, gear check, and lunch stop in West, TX." },
+            {
+              label: "3:15 PM:",
+              text: "Arrival in Dallas (accounts for I-35 construction around Waco/Temple and entry traffic into Dallas ahead of late-afternoon soundcheck/load-in).",
+            },
+          ],
+        },
       ],
     },
     {
-      id: "waverly-hotel",
-      heading: "The Waverly Hotel \u00b7 Friday night",
+      id: "lodging",
+      heading: "Lodging (Van & Trailer-Friendly)",
       place: {
-        name: "The Waverly Hotel",
+        name: "South Congress Motor Inn",
         rating: "4.5",
-        meta: "\u00b7 (860) \u00b7 $140 a night",
-        address: "Fifth Ave, San Diego",
-        status: "Check-in 3 PM",
-        statusTail: "\u00b7 van parking",
-        note: "4 min from the venue",
-        image: "/gemini/band-tour/place-waverly.png",
+        status: "Hotel",
+        image: "/v81-image-assets-inuse/assets/tour-austin-motel.jpg",
       },
       body: [
-        "The Waverly is a mid-range hotel on Fifth Avenue, four minutes on foot from the Copper Owl\u2019s back door.",
-        "It is the one booking on this route that takes a van: the car park is covered and gated, which matters with the gear in the back overnight.",
+        "South Congress Motor Inn provides an iconic South Congress location with dedicated outdoor surface parking, making it far simpler to navigate and park an oversized touring van or gear vehicle compared to downtown parking garages.",
       ],
       bullets: [
-        { label: "Rooms:", text: "Two twin rooms held for Friday, check-in from 3 PM, late arrival noted on the booking." },
-        { label: "Parking:", text: "Covered van parking on site, 2.4 m clearance, no charge for guests." },
-        { label: "Good to know:", text: "Breakfast runs to 10.00, ahead of the 10.30 check-out on Saturday." },
+        { text: "Open surface lot with ground-level access." },
+        { text: "Located minutes from major South Austin music venues and downtown." },
+        { text: "Retro, vibrant aesthetic with 24-hour front desk support." },
       ],
     },
     {
-      id: "marlin-room",
-      heading: "The Marlin Room \u00b7 Saturday",
+      id: "food-austin",
+      heading: "Food Stops \u00b7 Austin",
       place: {
-        name: "The Marlin Room",
-        rating: "4.8",
-        meta: "\u00b7 (2.4K)",
-        address: "Ocean Ave, Long Beach",
-        status: "Sat \u00b7 load-in 4 PM",
-        statusTail: "\u00b7 doors 8 PM",
-        note: "1 h 50 from San Diego",
-        image: "/gemini/band-tour/place-marlin.png",
+        name: "Casa Verde on South First",
+        rating: "4.4",
+        status: "Closed",
+        statusTone: "closed",
+        statusTail: "\u00b7 Opens 11:00 AM",
+        image: "/v81-image-assets-inuse/assets/tour-fresas.jpg",
       },
       body: [
-        "The Marlin Room is a 600 capacity room on Ocean Avenue in Long Beach, with a balcony and a long bar down one side.",
-        "It is the bigger of the two nights and the one worth arriving early for, with the sound check at 5.30 and the merch table to set up before doors.",
+        "Casa Verde on South First serves wood-grilled achiote and citrus chicken, scratch salsas, and fresh sides under an expansive patio canopy with dedicated surface parking.",
       ],
       bullets: [
-        { label: "Getting there:", text: "About 1 h 50 up the coast from San Diego, so on the road by 11 leaves the afternoon clear." },
-        { label: "The room:", text: "600 capacity, house PA, sound check 5.30, doors 8 and a 60 minute set at 9.30." },
-        { label: "Good to know:", text: "The merch table is by the bar and the venue takes no cut on merchandise." },
+        { text: "Signature charcoal-grilled achiote chicken platters and crunchy cabbage slaws." },
+        { text: "Fast walk-up or dine-in ordering suited for tight band schedules." },
       ],
     },
     {
-      id: "koji-ramen",
-      heading: "K\u014dji Ramen \u00b7 Saturday night",
-      place: {
-        name: "K\u014dji Ramen",
-        rating: "4.6",
-        meta: "\u00b7 (1.1K) \u00b7 $$",
-        address: "Pine Ave, Long Beach",
-        status: "Open late",
-        statusTail: "\u00b7 Closes 1 AM",
-        note: "3 min from the venue",
-        image: "/gemini/band-tour/place-koji.png",
-      },
-      body: [
-        "Koji Ramen is a ten-seat counter on Pine Avenue, three minutes on foot from the Marlin Room\u2019s front door.",
-        "It is the only kitchen near the venue still serving after a 9.30 set, which is what makes it the after-show stop.",
-      ],
+      id: "checklist",
+      heading: "Band Tour Execution Checklist",
+      numbered: true,
       bullets: [
-        { label: "Menu highlights:", text: "Tonkotsu and a vegetarian shoyu, gyoza, and most plates under fifteen dollars." },
-        { label: "Atmosphere:", text: "Ten seats at the counter, no bookings, and quietest before eleven." },
-        { label: "Good to know:", text: "Open until 1 AM on Saturdays with last orders at 12.30." },
+        {
+          label: "Advance Parking:",
+          text: "Call South Congress Motor Inn and The Elm Street Hotel 24 hours prior to confirm trailer length and reserve dedicated end-stalls or loading dock access.",
+        },
+        {
+          label: "Gear Security:",
+          text: "Ensure trailer hitch locks and secondary puck locks are installed prior to Friday night check-in; never leave exposed gear bags in passenger windows at hotel surface lots.",
+        },
+        {
+          label: "Toll Tag Check:",
+          text: "Equip the van with a TxTag/NTTA-compatible pass for the I-35 express lanes to bypass recurrent Waco and Dallas rush-hour bottlenecks.",
+        },
       ],
     },
-  ],
-  closingLines: [
-    "Three days, two shows and one drive home. The timings hold as long as the van leaves LA by 2.00 on Friday and is on the road by 11 on Saturday; everything after that has an hour of slack in it. The full itinerary, with the Sunday run and the settlement emails, is in the tour plan.",
   ],
 };
 
@@ -525,19 +533,19 @@ export const GO_OUT_MESSAGES: ChatBubble[] = [
   { kind: "incoming", name: "Marco", avatar: "/gemini/friday-night/avatar-marco.png", text: "Would love to go somewhere with vegetarian options" },
 ];
 
-export type SushiResult = {
+export type RestaurantResult = {
   id: string;
-  /** Section heading above this result, e.g. "Kanpai Sushi \u00b7 vegetarian menu \u00b7 0.4 mi" */
+  /** Section heading above this result, e.g. "Verdant Table \u00b7 fully vegetarian \u00b7 0.4 mi" */
   heading: string;
   name: string;
   rating: string;
-  /** Review count + price band, shown dimmed after the star, e.g. "\u00b7 (1.9K) \u00b7 $$" */
-  meta: string;
-  address: string;
-  /** Dimmed text after the green "Open", e.g. "\u00b7 Closes 11 PM" */
+  /** Category line under the rating, shown beside the vegetarian badge. */
+  category: string;
+  /** Dimmed text after the green "Open", e.g. "\u00b7 Closes 11:00 PM" */
   closesAt: string;
-  distance: string;
-  /** Prose under the result card \u2014 one <p> per entry. */
+  image: string;
+  /** Prose under the result card \u2014 one <p> per entry. A paragraph that opens with `name`
+   * gets the name underlined, the way the design links the place back to its card. */
   body: string[];
   bullets: PlaceBullet[];
   /** The message Gemini drafts into the group chat when this result is picked. Every result
@@ -550,95 +558,211 @@ export type SushiResult = {
  * The "go out" branch's response \u2014 a local-search answer rather than a text answer or a
  * task-automation flow, so it gets its own shape and its own renderer
  * (`GoOutResponse.tsx`). It plays entirely inside the Gemini overlay that floats over the
- * group chat: an intro, then a full section per result (heading, tappable photo card,
- * prose, bullets), then a closing comparison. Ends by drafting the tapped result's own
+ * group chat: a map of all three, an intro, then a full section per result (heading,
+ * tappable photo card, prose, bullets). Ends by drafting the tapped result's own
  * `draftText` back into the chat, followed by `replies`.
  */
-export type SushiSearchContent = {
+export type RestaurantSearchContent = {
   promptLines: string[];
+  /** Named in the loading beat \u2014 the app Gemini is reaching into, not a list of steps. */
+  loadingCaption: string;
+  /** The plain Maps still that heads the answer, with a food pin per restaurant. */
+  map: MapCard;
   introText: string;
-  results: SushiResult[];
-  /** Sums up all three; sits after the last result, so reaching it means the visitor scrolled. */
-  closingText: string;
+  results: RestaurantResult[];
   /** The group's answers, shown under whichever result's `draftText` was picked. Kept
    * choice-agnostic on purpose \u2014 they react to the plan, not to the specific restaurant. */
   replies: ChatBubble[];
 };
 
-export const GO_OUT_SEARCH: SushiSearchContent = {
-  // What the thread actually asked for, rather than naming a cuisine nobody mentioned.
-  // Narrowing to sushi is Gemini's recommendation, so it belongs in the answer below, not
-  // in the prompt: `introText` is where the three spots are proposed.
+export const GO_OUT_SEARCH: RestaurantSearchContent = {
   promptLines: ["Find me restaurants with vegetarian options nearby"],
-  introText: "Three sushi spots near you fit the thread, all open tonight. Vegetarian rolls and gluten free soy at every one.",
+  loadingCaption: "Connecting to Google Maps\u2026",
+  map: {
+    image: "/v81-image-assets-inuse/assets/map-venue-la.jpg",
+    // the still is taller than 2:1; the three restaurants sit in its upper part
+    aspectRatio: 2,
+    pinColor: "#F1BF42",
+    pins: [
+      { label: "Verdant Table", x: 0.3, y: 0.453, side: "right" },
+      { label: "Sprout Kitchen", x: 0.804, y: 0.292, side: "left" },
+      { label: "The Green Fig", x: 0.606, y: 0.689, side: "right" },
+    ],
+  },
+  introText: "Here are several nearby vegetarian and vegetarian-friendly restaurants to consider:",
   results: [
     {
-      id: "kanpai",
-      heading: "Kanpai Sushi \u00b7 vegetarian menu \u00b7 0.4 mi",
-      name: "Kanpai Sushi",
+      id: "verdant",
+      heading: "Verdant Table \u00b7 fully vegetarian \u00b7 0.4 mi",
+      name: "Verdant Table",
       rating: "4.7",
-      meta: "\u00b7 (1.9K) \u00b7 $$",
-      address: "214 Sawtelle Blvd",
-      closesAt: "\u00b7 Closes 11 PM",
-      distance: "0.4 mi",
+      category: "Vegetarian restaurant",
+      closesAt: "\u00b7 Closes 11:00 PM",
+      image: "/v81-image-assets-inuse/assets/pick/veg-dish-1.jpg",
       body: [
-        "Kanpai is a twenty-seat counter on Sawtelle with a short specials board that changes nightly.",
-        "It is the closest of the three and the only one with a full vegetarian menu rather than a few substitutions, which is what the thread asked for.",
+        "Verdant Table is a twenty-seat room on Sawtelle with a short seasonal menu that changes nightly.",
+        "It is the closest of the three and the whole menu is vegetarian rather than a few substitutions, which is what the thread asked for.",
       ],
       bullets: [
-        { label: "Menu highlights:", text: "Vegetarian rolls cut to order, gluten free soy on every table, and a five-piece nigiri set." },
+        { label: "Menu highlights:", text: "Roast squash with salsa verde, halloumi and grains, and a gluten free flatbread." },
         { label: "Atmosphere:", text: "Counter seating and two small tables, quiet early and busier after eight." },
         { label: "Good to know:", text: "Walk-ins only before seven, then a short wait; four minutes on foot from the flat." },
       ],
-      draftText: "Kanpai Sushi tonight? Veggie rolls and gluten free soy, five minutes away",
+      draftText: "Verdant Table tonight? Fully vegetarian with gluten free options, five minutes away",
     },
     {
-      id: "umi",
-      heading: "Umi Table \u00b7 gluten free soy \u00b7 0.7 mi",
-      name: "Umi Table",
+      id: "green-fig",
+      heading: "The Green Fig \u00b7 gluten free menu \u00b7 0.7 mi",
+      name: "The Green Fig",
       rating: "4.5",
-      meta: "\u00b7 (860) \u00b7 $$",
-      address: "88 Gayley Ave",
-      closesAt: "\u00b7 Closes 10.30 PM",
-      distance: "0.7 mi",
+      category: "Vegetarian-friendly restaurant",
+      closesAt: "\u00b7 Closes 10:30 PM",
+      image: "/v81-image-assets-inuse/assets/wk-nyc-2-int.jpg",
       body: [
-        "Umi Table is a larger room off Gayley with booths at the back and a sushi bar along the front.",
-        "It is the easiest of the three to seat four without booking, and the kitchen is used to keeping gluten free orders separate.",
+        "The Green Fig is a larger room off Gayley with booths at the back and an open kitchen along the front.",
+        "It is the easiest of the three to seat four without booking, and the kitchen keeps a separate gluten free menu rather than adapting dishes on the night.",
       ],
       bullets: [
-        { label: "Menu highlights:", text: "Gluten free soy as standard, vegetarian maki, and a hot menu beyond the sushi." },
-        { label: "Atmosphere:", text: "Booths at the back, table service, and enough room to talk." },
-        { label: "Good to know:", text: "Last orders at 10.00 for a 10.30 close, so it suits an earlier start." },
+        { label: "Menu highlights:", text: "Wood-fired vegetable plates, a lentil and aubergine stew, and a gluten free menu on its own page." },
+        { label: "Atmosphere:", text: "Booths at the back and a bar along the front, lively from eight." },
+        { label: "Good to know:", text: "Bookings taken but walk-ins seated most nights; ten minutes on foot." },
       ],
-      draftText: "Umi Table tonight? Veggie rolls and gluten free soy, and we can get four in without booking",
+      draftText: "The Green Fig tonight? Vegetarian with a gluten free menu, ten minutes away",
     },
     {
-      id: "aoki",
-      heading: "Aoki Street Sushi \u00b7 both \u00b7 1.1 mi",
-      name: "Aoki Street Sushi",
+      id: "sprout",
+      heading: "Sprout Kitchen \u00b7 open until midnight \u00b7 1.1 mi",
+      name: "Sprout Kitchen",
       rating: "4.8",
-      meta: "\u00b7 (2.3K) \u00b7 $$$",
-      address: "406 Broxton Ave",
-      closesAt: "\u00b7 Closes 12 AM",
-      distance: "1.1 mi",
+      category: "Vegetarian restaurant",
+      closesAt: "\u00b7 Closes 12:00 AM",
+      image: "/v81-image-assets-inuse/assets/wk-sf-2-int.jpg",
       body: [
-        "Aoki Street is the busiest of the three, a Broxton Avenue room that runs late and fills from nine.",
-        "It covers both requests at once, vegetarian rolls and gluten free soy, and it is the only one still serving at midnight if the evening runs long.",
+        "Sprout Kitchen is the busiest of the three, a Broxton Avenue room that runs late and fills from nine.",
+        "It covers both requests at once, fully vegetarian with gluten free dishes marked, and it is the only one still serving at midnight.",
       ],
       bullets: [
-        { label: "Menu highlights:", text: "A vegetarian omakase at a set price alongside the standard rolls, with gluten free soy throughout." },
-        { label: "Atmosphere:", text: "Loud and full after nine; the bar seats turn over faster than the tables." },
-        { label: "Good to know:", text: "Open until midnight and the only one of the three taking bookings tonight." },
+        { label: "Menu highlights:", text: "Sharing plates, a mushroom and truffle risotto, and gluten free dishes marked on the menu." },
+        { label: "Atmosphere:", text: "A long bar and close tables, loud and late." },
+        { label: "Good to know:", text: "No bookings after nine; the walk is fifteen minutes or a short ride." },
       ],
-      draftText: "Aoki Street Sushi tonight? Veggie rolls and gluten free soy, and they take a booking",
+      draftText: "Sprout Kitchen tonight? Vegetarian and gluten free, just up the street",
     },
   ],
-  closingText:
-    "All three are open tonight and all three cover the vegetarian and gluten free requests in the thread. Kanpai is the shortest walk, Umi Table the easiest to seat four without booking, and Aoki Street the one still serving at midnight.",
   replies: [
-    { kind: "incoming", name: "Priya", avatar: "/gemini/friday-night/avatar-priya.png", text: "perfect. 7.30?" },
-    { kind: "incoming", name: "Marco", avatar: "/gemini/friday-night/avatar-marco.png", text: "in." },
+    { kind: "incoming", name: "Marco", avatar: "/gemini/friday-night/avatar-marco.png", text: "Sounds perfect. 7:30?" },
+    { kind: "incoming", name: "Priya", avatar: "/gemini/friday-night/avatar-priya.png", text: "Let\u2019s do it!" },
   ],
+};
+
+/**
+ * "Build a study notebook" — the student's NotebookLM-style flow, rebuilt as "Gemini
+ * Notebook". It runs in its own three-tab app (Sources / Chat / Studio) rather than in the
+ * kiosk's Ask Gemini bar: sources load into the notebook, a prompt in the notebook's own
+ * input turns them into a study guide, and Studio holds a flip-card quiz and an audio
+ * overview. Rendered by `StudyNotebook.tsx`.
+ */
+export type NotebookSource = {
+  /** e.g. "Class notes · weeks 1–4" */
+  title: string;
+  /** A photo thumbnail for notes, or the doc glyph for a document. */
+  thumb?: string;
+};
+
+export type StudyGuideItem = {
+  heading: string;
+  body: string;
+  /** Source numbers (1-based) cited against this point, drawn as the small navy chips. */
+  cites: number[];
+};
+
+export type QuizCard = { question: string; answer: string };
+
+export type StudyNotebookContent = {
+  notebookTitle: string;
+  /** Typed into the notebook's input on the empty Sources tab. */
+  setupPrompt: string;
+  sources: NotebookSource[];
+  /** Typed into the input once the sources are in and the notebook moves to Chat. */
+  chatPrompt: string;
+  guideTitle: string;
+  guide: StudyGuideItem[];
+  quizTitle: string;
+  quiz: QuizCard[];
+  audio: { title: string; meta: string; transcript: { speaker: string; line: string }[] };
+  disclaimer: string;
+};
+
+export const STUDY_NOTEBOOK: StudyNotebookContent = {
+  notebookTitle: "Biology 101",
+  setupPrompt: "Create a study notebook to help me get organized for class",
+  sources: [
+    { title: "Class notes \u00b7 weeks 1\u20134", thumb: "/v81-image-assets-inuse/assets/wb-bio2.jpg" },
+    { title: "Class notes \u00b7 cells and structures", thumb: "/v81-image-assets-inuse/assets/wb-bio.jpg" },
+    { title: "Course syllabus \u00b7 Biology 101" },
+    { title: "Lecture slides \u00b7 Plant and animal cells" },
+  ],
+  chatPrompt:
+    "I\u2019m preparing for my first biology exam. Based on my uploaded class notes and syllabus, help me learn the difference between plant and animal cells.",
+  guideTitle: "Study guide \u00b7 Plant vs animal cells",
+  guide: [
+    {
+      heading: "Cell wall and chloroplasts",
+      body: "Plant cells add a rigid cell wall and chloroplasts for photosynthesis. Animal cells have neither.",
+      cites: [3, 4],
+    },
+    {
+      heading: "The central vacuole",
+      body: "One large central vacuole in plant cells; animal cells use several small vacuoles instead.",
+      cites: [2, 4],
+    },
+    {
+      heading: "Centrioles",
+      body: "Appear only in animal cells, organizing the spindle fibres when the cell divides.",
+      cites: [4],
+    },
+    {
+      heading: "Mitochondria",
+      body: "Both cell types carry them - the classic exam trick question is that they are not plant-only.",
+      cites: [3, 4],
+    },
+  ],
+  quizTitle: "Biology 101 Quiz",
+  // Q1, A1, Q2 and A6 are the design's copy. Everything marked PLACEHOLDER is stand-in text
+  // written from the study guide until the real quiz copy arrives.
+  quiz: [
+    { question: "Which cells have a cell wall?", answer: "Plant cells. Animal cells only have a membrane." },
+    {
+      question: "Where does photosynthesis happen?",
+      answer: "In the chloroplasts, which only plant cells have.", // PLACEHOLDER answer
+    },
+    {
+      question: "How many vacuoles does a plant cell usually have?", // PLACEHOLDER
+      answer: "One large central vacuole. Animal cells have several small ones.", // PLACEHOLDER
+    },
+    {
+      question: "Which cell type has centrioles?", // PLACEHOLDER
+      answer: "Animal cells. They organize the spindle fibres when the cell divides.", // PLACEHOLDER
+    },
+    {
+      question: "What is a plant cell wall mostly made of?", // PLACEHOLDER
+      answer: "Cellulose, and it sits outside the membrane.", // PLACEHOLDER
+    },
+    {
+      question: "Which cells have mitochondria?", // PLACEHOLDER question
+      answer: "Both. Plant and animal cells both make energy there.",
+    },
+  ],
+  audio: {
+    title: "Audio Overview",
+    meta: "Brief \u00b7 7 min",
+    transcript: [
+      { speaker: "Host", line: "Okay, plant versus animal cells. The wall is the giveaway?" },
+      { speaker: "Co-host", line: "The wall and the chloroplasts. Your notes flag both." },
+      { speaker: "Host", line: "And the one big vacuole. That is the exam question." },
+    ],
+  },
+  disclaimer: "Gemini Notebook can be inaccurate; please double check its responses.",
 };
 
 export type Persona = {
@@ -720,7 +844,7 @@ export const RUNDOWNS: Record<string, RundownData> = {
       { id: "study-semester", label: "Organize my semester", active: true },
       { id: "friday-night", label: "Make plans for Friday night", active: true },
       { id: "band-tour", label: "Rock the band tour", active: true },
-      { id: "study-notebook", label: "Build a study notebook" },
+      { id: "study-notebook", label: "Build a study notebook", active: true },
     ],
   },
   traveler: {

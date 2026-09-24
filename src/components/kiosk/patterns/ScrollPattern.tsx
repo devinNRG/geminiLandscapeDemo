@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PatternProps } from "../types";
-import { ContinuousFlow, ScrollCue, useScrollCue } from "../shared";
+import { ContinuousFlow, RisingDotsCue, revealDurationMs, useScrollCue, useScrolledOnce, useThinkingPhase } from "../shared";
 
-// distance from the frame's bottom edge to the resting (idle) compose bubble's top edge
-// is 56.25 - 45.94 = 10.31cqw (frame height 56.25cqw at 16:9, bubble top pinned to 45.94cqw
-// in page.tsx) — this sits the cue just above the bubble with a small gap on top of that.
-const CUE_BOTTOM_CQW = 11.3;
+// the cue follows the answer rather than arriving with it: it waits for the first
+// screenful (prompt, map, first heading) to finish revealing, same beat as go out's
+const CUE_DELAY_MS = revealDurationMs(2) + 300;
 // mid-scroll, content is free to run under the bubble (see the pb below) — but once you've
 // scrolled all the way, the trailing footer should clear it, not sit permanently hidden
-// underneath with nothing left to scroll past. Matches CUE_BOTTOM_CQW's own clearance math.
+// underneath with nothing left to scroll past. The idle bubble's top sits 10.31cqw off the
+// frame's bottom (56.25 - 45.94), so this clears it with a small gap.
 const BOTTOM_CLEARANCE_CQW = 11.5;
 
 /**
@@ -18,14 +18,27 @@ const BOTTOM_CLEARANCE_CQW = 11.5;
  * no column-splitting, just scroll. Content runs under the floating Ask
  * Gemini bubble while scrolling through it rather than stopping short, but
  * ends with enough trailing space (BOTTOM_CLEARANCE_CQW) that the final
- * block — the response footer — clears the bubble once fully scrolled. A
- * circular down-arrow cue sits just above that bubble whenever there's more
- * to scroll to, and doubles as a tap target to jump forward.
+ * block — the response footer — clears the bubble once fully scrolled. The
+ * rising-dots cue sits centred over the answer while there's more to scroll to,
+ * until the visitor first scrolls, and doubles as a tap target to jump forward.
  */
 export default function ScrollPattern({ content, active, onComplete }: PatternProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const { hasMore, scrollForward } = useScrollCue(scrollRef, innerRef);
+  const scrolled = useScrolledOnce(scrollRef, active);
+
+  // same thinking beat ContinuousFlow reveals on, so the delay counts from the answer landing
+  const { contentShown } = useThinkingPhase(active);
+  const [cueReady, setCueReady] = useState(false);
+  useEffect(() => {
+    if (!contentShown) return;
+    const t = setTimeout(() => setCueReady(true), CUE_DELAY_MS);
+    return () => {
+      clearTimeout(t);
+      setCueReady(false);
+    };
+  }, [contentShown]);
 
   // start each new answer scrolled to the top rather than wherever the previous one left off
   useEffect(() => {
@@ -44,8 +57,10 @@ export default function ScrollPattern({ content, active, onComplete }: PatternPr
         </div>
       </div>
 
-      <div className="absolute left-1/2 z-10 -translate-x-1/2" style={{ bottom: `${CUE_BOTTOM_CQW}cqw` }}>
-        <ScrollCue show={active && hasMore} onClick={scrollForward} size={3.6} className="border-white/10 bg-white/5" />
+      {/* dead centre over the answer — it's a swipe cue, so it sits where the swipe would
+          start rather than tucked against the frame's bottom edge */}
+      <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+        <RisingDotsCue show={active && cueReady && hasMore && !scrolled} onClick={scrollForward} />
       </div>
     </div>
   );

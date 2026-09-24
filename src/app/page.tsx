@@ -13,10 +13,11 @@ import {
   SEMESTER_PLAN,
   STAY_IN_MESSAGES,
   STAY_IN_SUGGESTION,
+  STUDY_NOTEBOOK,
   WEEKEND_RESPONSE,
   type ChatBubble,
   type MessagesSuggestion,
-  type SushiResult,
+  type RestaurantResult,
   type Persona,
   type ResponseContent,
 } from "@/components/kiosk/types";
@@ -24,22 +25,24 @@ import TypingLines from "@/components/kiosk/TypingLines";
 import RundownScreen from "@/components/kiosk/RundownScreen";
 import FridayNightChoiceScreen from "@/components/kiosk/FridayNightChoiceScreen";
 import TaskAutomationResponse from "@/components/kiosk/TaskAutomationResponse";
-import GoOutResponse from "@/components/kiosk/GoOutResponse";
+import GoOutResponse, { GO_OUT_CUE_DELAY_MS } from "@/components/kiosk/GoOutResponse";
 import MessagesScene from "@/components/kiosk/MessagesScene";
 import SemesterPlanResponse from "@/components/kiosk/SemesterPlanResponse";
+import StudyNotebook from "@/components/kiosk/StudyNotebook";
 import ScrollPattern from "@/components/kiosk/patterns/ScrollPattern";
-import { BackButton, CometRing, PulseRings } from "@/components/kiosk/shared";
+import { BackButton, GradientPillButton, PulseRings, useThinkingPhase } from "@/components/kiosk/shared";
 
 type Stage = "landing" | "rundown" | "fridayNightChoice" | "idle" | "typed" | "response";
 
 // which built demo the compose bar / response area are currently playing
-type DemoId = "weekend" | "fridayNight" | "goOut" | "bandTour" | "semester";
+type DemoId = "weekend" | "fridayNight" | "goOut" | "bandTour" | "semester" | "notebook";
 
 // pill id -> the demo it plays; every other pill renders disabled on the rundown screen
 const PILL_DEMOS: Record<string, DemoId> = {
   "friends-weekend": "weekend",
   "band-tour": "bandTour",
   "study-semester": "semester",
+  "study-notebook": "notebook",
   // "friday-night" is deliberately absent — it routes through the fridayNightChoice
   // screen instead, which sets activeDemo to "fridayNight" or "goOut" itself
 };
@@ -78,6 +81,8 @@ const PROMPT_LINES_BY_DEMO: Record<DemoId, string[]> = {
   goOut: GO_OUT_SEARCH.promptLines,
   bandTour: BAND_TOUR_RESPONSE.promptLines,
   semester: SEMESTER_PLAN.promptLines,
+  // typed into the notebook's own input, not the Ask Gemini bar (see StudyNotebook)
+  notebook: [STUDY_NOTEBOOK.setupPrompt],
 };
 
 // the expanded (multi-line) compose box's height must fit whatever text is currently visible,
@@ -116,25 +121,57 @@ const COMPOSE_SLIDE_MS = 500;
 // ms per character — slower than the default so the prompt reads as deliberate, not rushed
 const TYPING_TICK_MS = 45;
 
+// Go out's pick prompt, centred on the idle compose pill's own middle (53.27 - 7.33 / 2)
+const PICK_PROMPT_HEIGHT_CQW = 5.2;
+const PICK_PROMPT_TOP_CQW = COMPOSE_BOTTOM_CQW - 7.33 / 2 - PICK_PROMPT_HEIGHT_CQW / 2;
+// gap between the results panel's scroll cue appearing and this prompt sliding up
+const PICK_PROMPT_AFTER_CUE_MS = 700;
+
+const PICK_RING_MS = 2400;
+const PICK_RING_COUNT = 3;
+
+/**
+ * "Tap on your chosen restaurant" — a black pill with no rim of its own, and rings that close
+ * *in* on it: each starts wide and faint and homes onto the pill's edge, slowing as it
+ * arrives (`pill-converge` in globals.css). Send's rings leave the button; these arrive at
+ * the label, pulling the eye onto the instruction rather than away from it.
+ */
+function PickPrompt({ active }: { active: boolean }) {
+  return (
+    <div
+      className="relative flex items-center whitespace-nowrap rounded-full bg-black px-[3cqw] text-[1.6cqw] text-white"
+      style={{ height: `${PICK_PROMPT_HEIGHT_CQW}cqw` }}
+    >
+      {active &&
+        Array.from({ length: PICK_RING_COUNT }, (_, i) => (
+          <span
+            key={i}
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-full border-[0.12cqw] border-white opacity-0"
+            style={{
+              animation: `pill-converge ${PICK_RING_MS}ms cubic-bezier(0.2, 0.7, 0.3, 1) infinite`,
+              animationDelay: `${(i * PICK_RING_MS) / PICK_RING_COUNT}ms`,
+            }}
+          />
+        ))}
+      Tap on your chosen restaurant
+    </div>
+  );
+}
+
 /**
  * The shared exit affordance every demo hands off to once its content has played out — a
  * text answer finished revealing, or FoodOrder was paid — rather than each demo authoring
  * its own "back" button inside its own content.
  *
+ * Goes back to the persona's rundown, not the landing page: every demo is started from a
+ * rundown pill, so that's the screen the visitor came from and the one with the next
+ * demo on it.
+ *
  * Floated into the frame's bottom-right corner, with the QR code opposite it.
  */
-function BackHomeButton({ onClick }: { onClick: () => void }) {
-  return (
-    <CometRing active pulse>
-      <button
-        type="button"
-        onClick={onClick}
-        className="rounded-full bg-[#1f3b9b] px-[1.8cqw] py-[1cqw] text-[1.2cqw] font-medium text-white active:bg-[#17307d]"
-      >
-        Back to home
-      </button>
-    </CometRing>
-  );
+function BackToRundownButton({ onClick }: { onClick: () => void }) {
+  return <GradientPillButton onClick={onClick}>Back to your rundown</GradientPillButton>;
 }
 
 /**
@@ -163,7 +200,7 @@ export default function Home() {
   // screen; go out never does — it ends by drafting back into the same thread.
   const [chatVisibleInResponse, setChatVisibleInResponse] = useState(true);
   // the result picked in go out, appended to the thread as Gemini's drafted plan
-  const [goOutPick, setGoOutPick] = useState<SushiResult | null>(null);
+  const [goOutPick, setGoOutPick] = useState<RestaurantResult | null>(null);
 
   const frameRef = useRef<HTMLDivElement>(null);
   const liveTextRef = useRef<HTMLDivElement>(null);
@@ -271,7 +308,33 @@ export default function Home() {
   // prompt is sent that flow is a reasoning rail and then a full-bleed Google Calendar, and
   // the source design shows no compose bar for either. Leaving it up would also squeeze the
   // rail, which needs the band the bar sits in to finish inside the frame.
-  const composeParked = (showMessagesScene && showHero) || (showResponse && activeDemo === "semester");
+  //
+  // Go out and the band tour park it too, once their results are up. In go out the only
+  // thing left to do is pick a restaurant, so the band belongs to the "tap on your chosen
+  // restaurant" prompt; the band tour's answer is the end of its flow. Nothing later in
+  // either asks Gemini anything, so the bar doesn't come back. Timed off the same thinking
+  // beat both answers reveal on, so the bar leaves as the results land.
+  const { contentShown: resultsUp } = useThinkingPhase(
+    showResponse && (activeDemo === "goOut" || activeDemo === "bandTour"),
+  );
+  const goOutResultsUp = resultsUp && activeDemo === "goOut";
+  // The study notebook parks it for the whole demo: the notebook has an input of its own.
+  const composeParked =
+    (showMessagesScene && showHero) ||
+    (showResponse && (activeDemo === "semester" || activeDemo === "notebook")) ||
+    resultsUp;
+  // ...and the pick prompt comes last, a beat after the answer's scroll cue, so results,
+  // cue and prompt each get their own moment instead of landing as one
+  const [pickPromptDue, setPickPromptDue] = useState(false);
+  useEffect(() => {
+    if (!goOutResultsUp) return;
+    const t = setTimeout(() => setPickPromptDue(true), GO_OUT_CUE_DELAY_MS + PICK_PROMPT_AFTER_CUE_MS);
+    return () => {
+      clearTimeout(t);
+      setPickPromptDue(false);
+    };
+  }, [goOutResultsUp]);
+  const showPickPrompt = pickPromptDue && goOutResultsUp && !goOutPick;
 
   // Stable identities on purpose: the response components hold these in effect dependency
   // arrays alongside their own timers, so a fresh closure each render would tear down and
@@ -297,6 +360,13 @@ export default function Home() {
       return;
     }
     const demo = PILL_DEMOS[pillId];
+    // the notebook is its own app with its own input, so it skips the Ask Gemini typing
+    // beat and opens straight onto its empty Sources tab
+    if (demo === "notebook") {
+      setActiveDemo(demo);
+      setStage("response");
+      return;
+    }
     if (demo) {
       setActiveDemo(demo);
       setStage("typed");
@@ -400,6 +470,11 @@ export default function Home() {
                     : undefined
                 }
                 showComposeBar={showMessagesScene}
+                // Gemini holds the foreground from the chip tap onward — first its compose
+                // bar, then its answer panel — so the chat behind it steps back for both.
+                // Picking a restaurant closes that panel and hands the thread back, so the
+                // drafted plan and the replies land at full brightness.
+                dimmed={showMessagesScene && !showHero && !goOutPick}
               />
             </div>
 
@@ -421,6 +496,14 @@ export default function Home() {
                      late — the same trap the chat state above is kept out of */
                   key={showResponse ? "run" : "idle"}
                   content={SEMESTER_PLAN}
+                  active={showResponse}
+                  onComplete={handleDemoComplete}
+                />
+              ) : activeDemo === "notebook" ? (
+                <StudyNotebook
+                  // remounted per run, like the semester demo, so every run starts empty
+                  key={showResponse ? "run" : "idle"}
+                  content={STUDY_NOTEBOOK}
                   active={showResponse}
                   onComplete={handleDemoComplete}
                 />
@@ -543,14 +626,23 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Go out's pick prompt, in the band the Ask Gemini bar just vacated, riding the same
+            slide in from below the frame. A label, not a button: the restaurant photos are
+            what get tapped, and this only says so. Leaves the same way once one is picked. */}
+        <div
+          className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 transition-[top,opacity] duration-500 ease-in-out"
+          style={{ top: showPickPrompt ? `${PICK_PROMPT_TOP_CQW}cqw` : "58cqw", opacity: showPickPrompt ? 1 : 0 }}
+        >
+          <PickPrompt active={showPickPrompt} />
+        </div>
+
         {/* the demo's ending — floated into opposite bottom corners of the frame. The
-            entrance animation always lives on a wrapper, never on the button itself: it
-            and the comet ring's pulse both drive `transform`, so on one element the later
-            one simply wins and the other silently does nothing. */}
+            entrance animation always lives on a wrapper, never on the button itself, so it
+            can't fight anything the button (or its rings) animate on `transform`. */}
         {showResponse && demoComplete && (
           <>
             <div className="absolute bottom-[2.5cqw] right-[2.87cqw] z-20 [animation:fade-in-up_400ms_ease-out]">
-              <BackHomeButton onClick={() => setStage("landing")} />
+              <BackToRundownButton onClick={() => setStage("rundown")} />
             </div>
             <div className="absolute bottom-[2.5cqw] left-[2.87cqw] z-20 [animation:fade-in-up_400ms_ease-out]">
               <QrPrompt />

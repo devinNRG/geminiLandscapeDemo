@@ -234,3 +234,53 @@ body {
     box-shadow: 0 0 1cqw 0.2cqw rgba(76, 141, 246, 0.3);
   }
 }
+
+/* The results panel's scroll indicator: four dots rise from the foot of a vertical pill to
+   the same resting spot at its top, on a loop. Each leaves later than the one ahead of it
+   *and* climbs more slowly, so the gaps between them open up on the way and the column
+   reads as travelling upward, not as one blob; they only bunch at the very top. One
+   shared cycle length keeps the loop in step. Travel comes in as --travel so the geometry
+   stays in the component. */
+@keyframes scroll-dot-1 {
+  0% { transform: translateY(var(--travel)); opacity: 0; }
+  6% { opacity: 1; }
+  32%, 86% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(0); opacity: 0; }
+}
+@keyframes scroll-dot-2 {
+  0%, 5% { transform: translateY(var(--travel)); opacity: 0; }
+  11% { opacity: 1; }
+  41%, 86% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(0); opacity: 0; }
+}
+@keyframes scroll-dot-3 {
+  0%, 10% { transform: translateY(var(--travel)); opacity: 0; }
+  16% { opacity: 1; }
+  50%, 86% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(0); opacity: 0; }
+}
+@keyframes scroll-dot-4 {
+  0%, 15% { transform: translateY(var(--travel)); opacity: 0; }
+  21% { opacity: 1; }
+  59%, 86% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(0); opacity: 0; }
+}
+
+/* The "tap on your chosen restaurant" pill's rings run the other way from Send's: each one
+   starts out wide and faint and closes in on the pill, easing off as it reaches the pill's
+   own edge, where it settles into the rim and fades. Inset rather than scale, so the ring
+   keeps a fixed gap around a pill far wider than it is tall — the design's echoes hug it. */
+@keyframes pill-converge {
+  0% { inset: -1.6cqw -2cqw; opacity: 0; }
+  25% { opacity: 0.6; }
+  80% { opacity: 0.45; }
+  100% { inset: 0; opacity: 0; }
+}
+
+/* pulse-ring for a button that isn't round: the ring steps out a fixed distance (--spread)
+   on every side instead of scaling, so it stays the same gap from a wide pill's ends as
+   from its top and bottom — a scale would push the ends out far further than the sides. */
+@keyframes pulse-ring-spread {
+  from { inset: 0; opacity: 0.5; }
+  to { inset: calc(-1 * var(--spread)); opacity: 0; }
+}

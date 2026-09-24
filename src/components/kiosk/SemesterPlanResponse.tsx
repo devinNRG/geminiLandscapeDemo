@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarEvent, CalendarMonth, CalendarTone, SemesterPlanContent, ThinkingStep } from "./types";
-import { ScrollCue, useScrollCue } from "./shared";
+import { RisingDotsCue, useScrollCue, useScrolledOnce } from "./shared";
 
 /** Both acts run in this one column — the same width the other task answer uses, and the
  * same card: the reasoning rail does not hand off to a wider surface, it becomes it. */
@@ -19,6 +19,9 @@ const EVENT_STAGGER_MS = 38;
 const EVENT_DURATION_MS = 420;
 /** Beat after the last chip lands before the exit affordances are offered. */
 const CALENDAR_SETTLE_MS = 600;
+// the scroll cue follows the calendar in rather than arriving with it: long enough for the
+// card's fade-in and the first events to start landing, well short of the whole fill
+const CALENDAR_CUE_DELAY_MS = 1000;
 
 /** Tone → chip fill. Sampled off the design rather than picked: these eight are what make a
  * month this dense readable at a glance, so they are a fixed set, not a palette to extend. */
@@ -167,6 +170,13 @@ function CalendarCard({ content }: { content: SemesterPlanContent }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const { hasMore, scrollForward } = useScrollCue(scrollRef, innerRef);
+  // this component mounts once per calendar, so the latch is armed for its whole life
+  const scrolled = useScrolledOnce(scrollRef, true);
+  const [cueReady, setCueReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setCueReady(true), CALENDAR_CUE_DELAY_MS);
+    return () => clearTimeout(t);
+  }, []);
 
   // Every chip's place in the fill order — by month, then by day, which is the order someone
   // reads a calendar in and so the order it should appear to be written in. A map rather than
@@ -218,10 +228,11 @@ function CalendarCard({ content }: { content: SemesterPlanContent }) {
             </div>
           </div>
 
-          {/* the only thing saying the term runs past October — nothing here auto-scrolls,
-              and it doubles as a tap target for anyone who would rather not swipe */}
-          <div className="absolute bottom-[1cqw] left-1/2 -translate-x-1/2">
-            <ScrollCue show={hasMore} onClick={scrollForward} size={2.8} className="border-white/12 bg-[#26272a]" />
+          {/* the only thing saying the term runs past October — nothing here auto-scrolls. Centred
+              over the calendar, where the swipe would start; gone after the first scroll, and
+              a tap target for anyone who would rather not swipe */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <RisingDotsCue show={cueReady && hasMore && !scrolled} onClick={scrollForward} />
           </div>
         </div>
       </div>

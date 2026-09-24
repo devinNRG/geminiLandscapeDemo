@@ -321,3 +321,183 @@ sushi, so `GO_OUT_SEARCH.promptLines` went from "Find the best sushi restaurants
 sushi is now Gemini's own recommendation, made in `introText` ("Three sushi spots near you fit
 the thread…"), which is where a recommendation belongs. Nothing in the answer needed rewriting
 for that to read correctly.
+
+## [x] 06 — In-line Gemini Intelligence RCS
+
+**Target (from portrait):**
+- Differences: Comet trail follows rainbow white gradient, in-line container shifts down to sit above the RCS input text container vs in-line with the messages, also RCS UI is contained within another gray background
+- Screenshot: /public/parity-screenshots/06-intelligencepill.png
+
+**Behavior:**
+N/A
+
+**Where to look:**
+First RCS screen in Go out flow
+
+**Done when:**
+UI screen matches screenshot but consistent with our landscape changes and design language
+
+---
+
+## Change log — screenshot-driven tweaks
+
+From here on, changes come in one at a time as screenshots in chat rather than as
+numbered tasks above. Newest at the bottom.
+
+### 2026-09-24 — Messages panels read as one surface
+- The dark body sheet's top corners are square, so it meets the lighter header with no
+  notch at the seam; only its bottom corners stay rounded.
+- Header and body share one width (`PANEL_WIDTH`, 49.7cqw). They used to differ (49.2 vs
+  49.7) and the body overhung the header either side. The header took the body's width so
+  nothing inside the sheet moved.
+- Where: `src/components/kiosk/MessagesScene.tsx`.
+
+### 2026-09-24 — Messages app dims once Gemini takes over
+- Tapping the Gemini Intelligence chip now lays a dark wash (black at 60%, 500ms fade) over
+  the whole Messages app — header, thread and RCS bar — while the "Ask Gemini" bar slides up
+  bright on top. It holds through Gemini's answer panel and lifts when a restaurant is
+  picked (so the drafted plan lands at full brightness) or when the chat leaves.
+- Where: new `dimmed` prop on `MessagesScene`, set from `page.tsx` as
+  `showMessagesScene && !showHero && !goOutPick`.
+
+
+### 2026-09-24 — Go out: Maps loading beat, new restaurants, new drafts
+Reference: `~/Downloads/Go out updated copy/` (screenshots 2026-09-24, 3.12–3.14 PM).
+- **Loading:** just the spinning dots, the Google Maps logo and "Connecting to Google
+  Maps…". The cycling "Checking what's open… / Matching everyone's asks…" captions are
+  gone. `ThinkingIndicator` gained an optional `icon` prop for the logo.
+- **Results:** a Maps still with the three pins heads the answer, then "Here are several
+  nearby vegetarian and vegetarian-friendly restaurants to consider:", then Verdant Table
+  (0.4 mi), The Green Fig (0.7 mi), Sprout Kitchen (1.1 mi), with copy taken word for word from
+  the screenshots. Cards show name, rating, a vegetarian badge + category, and Open · Closes;
+  the old address, review count, price and distance lines are gone. Headings are regular
+  weight, and a paragraph that opens on the restaurant's name dotted-underlines it. The
+  closing comparison paragraph is gone (the design ends after the last result's bullets).
+- **Drafts per pick:** Verdant Table → "…Fully vegetarian with gluten free options, five
+  minutes away"; The Green Fig → "…Vegetarian with a gluten free menu, ten minutes away";
+  Sprout Kitchen → "…Vegetarian and gluten free, just up the street".
+- **Replies:** Marco "Sounds perfect. 7:30?", then Priya "Let's do it!".
+- **Assets:** the originals from `public/v81-image-assets-inuse/assets/` — Verdant Table
+  `pick/veg-dish-1.jpg`, The Green Fig `wk-nyc-2-int.jpg`, Sprout Kitchen `wk-sf-2-int.jpg`,
+  map `map-venue-la.jpg`. The map is the plain still; the pins, name chips, wordmark and expand
+  glyph are drawn over it (`RestaurantMap` in `GoOutResponse.tsx`). Only the vegetarian badge
+  is still a crop from the reference screenshot (`public/gemini/go-out/icon-vegetarian.png`),
+  since the asset folder has no copy of it.
+- Types renamed from `SushiResult` / `SushiSearchContent` to `RestaurantResult` /
+  `RestaurantSearchContent`.
+- Where: `src/components/kiosk/types.ts` (`GO_OUT_SEARCH`), `GoOutResponse.tsx`,
+  `ThinkingIndicator.tsx`, `page.tsx`.
+
+
+### 2026-09-24 — Go out: scroll indicator, pick prompt, compose bar leaves
+- **Scroll indicator:** Gemini's panel swaps its down-arrow for a glassy vertical pill with
+  four dots rising at staggered speeds to the same spot at its top, on a loop. Hidden once
+  the visitor scrolls the answer; still taps to jump forward. `RisingDotsCue` in
+  `GeminiOverlay.tsx`, keyframes `scroll-dot-1..4` in `globals.css`. The panel is shared,
+  so the stay-in card gets it too if it ever overflows.
+- **Pick prompt:** once the results are up, the Ask Gemini bar slides away and a
+  "Tap on your chosen restaurant" pill (black, bright rim, pulsing rings) slides into its
+  band. It's a label, not a button. It leaves when a
+  restaurant is picked.
+- **Compose bar:** doesn't come back for the rest of the go out flow; the final thread shows
+  only the RCS bar. Both timed off the same thinking beat as the results
+  (`useThinkingPhase` in `page.tsx`).
+
+### 2026-09-24 — Go out: staged arrivals, cue centred and spaced
+- **Order:** results reveal first; the scroll cue follows once the first screenful has
+  settled (`GO_OUT_CUE_DELAY_MS` in `GoOutResponse.tsx`, ≈1s after the results start); the
+  pick prompt slides up 700ms after that (`PICK_PROMPT_AFTER_CUE_MS` in `page.tsx`). The
+  Ask Gemini bar still leaves as the results arrive. `GeminiOverlay` takes a `cueReady`
+  prop to hold its cue back.
+- **Cue position:** dead centre of the results panel instead of its bottom edge.
+- **Cue dots:** each dot now sets off later *and* climbs slower than the one ahead
+  (`scroll-dot-1..4`), so they're clearly spaced on the way up and only meet at the top.
+  Dots are a touch smaller (1.3cqw) for more travel, and the cycle is 2.6s.
+- **Cue centring:** dots were a border-width right of centre (offset measured inside the
+  border); now centred off the pill's midline.
+- **Cue contrast:** the pill has a dark base under its glass sheen — centred, it often sits
+  on the light map, where the sheen alone went milky and hid the dots.
+
+### 2026-09-24 — Go out: dot stagger rebalanced; rings replace comet trails
+- **Cue dots:** halfway between the bunched first pass and the strung-out second one —
+  dots set off 5% of the cycle apart (was 9%) and land 9% apart (was 14%), on a 2.4s loop.
+- **Pick prompt:** rings converge instead of radiate — three rings start wide and faint and
+  close in on the pill, easing off as they reach its edge (`pill-converge` in `globals.css`,
+  2.4s, staggered a third of a cycle apart). This is the reference screenshot's tight stack
+  of echoes, in motion. Send and Back to home keep the outward `PulseRings`.
+- **Restaurant photos:** comet trail and glow removed; the pick prompt carries the cue now.
+- **Back to home:** comet trail swapped for Send's `PulseRings`. It's the one shared
+  `BackHomeButton` in `page.tsx`, so every demo's ending gets it.
+
+### 2026-09-24 — Pick prompt loses its rim; Back to home restyled
+- **Pick prompt:** no standing border — only the converging rings outline it now.
+- **Back to home rings:** step out a fixed 1.4cqw on every side (`PulseRings spread`, keyframe
+  `pulse-ring-spread`) instead of scaling, so they keep an even gap around the pill. Send is
+  round, so it keeps the scaling rings.
+- **Back to home fill:** the design's blue gradient, left to right `#4a82f6 → #436feb (40%) →
+  #6199f6`, sampled from the reference screenshot (`Screenshot 2026-09-24 at 3.13.22 PM`).
+- **Back to home → "Back to your rundown":** relabelled per the reference, and it now goes
+  back to the persona's rundown instead of the landing page, since every demo starts from a
+  rundown pill. Component renamed `BackToRundownButton`.
+
+### 2026-09-24 — Rock the band tour: new prompt, Austin → Dallas answer
+Reference: `~/Downloads/Rock the band tour/` (screenshots 2026-09-24, 3.59 PM).
+- **Prompt:** "The band is playing a show Friday night in Austin and Saturday night in
+  Dallas. Help plan the trip, including hotel suggestions, places to eat, and travel timing
+  with the van."
+- **Answer** (`BAND_TOUR_RESPONSE` in `types.ts`), copy word for word from the screenshots:
+  map → Van Travel Timing & Route Logistics (Austin card; route, drive time, and a nested
+  timed buffer schedule) → Lodging (Van & Trailer-Friendly) (South Congress Motor Inn) →
+  Food Stops · Austin (Casa Verde on South First, "Closed · Opens 11:00 AM") → Band Tour
+  Execution Checklist (numbered). No intro or closing paragraph, since the design has neither.
+  The response footer (thumbs, share, disclaimer) stays.
+- **Map:** `map-texas-tour-wide.jpg` with the I-35 route, blue pins and name chips drawn
+  over it, traced from the screenshot. The Go out map and this one now share one component,
+  `PinnedMap` in `shared.tsx` (pin colour and route are per-map); the old two-layer
+  `MapCardBlock` and its SVG overlay are gone.
+- **Images:** `tour-austin.jpg`, `tour-austin-motel.jpg`, `tour-fresas.jpg` from
+  `v81-image-assets-inuse/assets/`.
+- **Renderer additions** (shared, opt-in, so the weekend answer is untouched): place cards
+  draw only the rows they have; a coloured status (`statusTone: "closed"` for the soft red);
+  bullets without a label, nested sub-bullets, numbered bullets (`numbered`); regular-weight
+  headings (`plainHeadings`); a paragraph opening on the card's name dotted-underlines it.
+- **Ask Gemini bar:** slides away as the results land and doesn't come back, same timing
+  as Go out.
+- The old band-tour assets in `public/gemini/band-tour/` (San Diego map, overlay, pin and
+  the four place photos) are no longer referenced; only `map-expand.png` is still used.
+
+### 2026-09-24 — Rising-dots scroll cue replaces the down arrow in text answers
+- The band tour (and the weekend answer, which shares `ScrollPattern`) now use the
+  rising-dots cue instead of the circular down arrow: centred over the answer, arriving
+  just after the first screenful reveals, gone after the first scroll, and still a tap
+  target to jump forward.
+- `RisingDotsCue` and its "has the visitor scrolled yet" latch (`useScrolledOnce`) moved out
+  of `GeminiOverlay.tsx` into `shared.tsx`, so Go out's panel and the text answers share one
+  cue.
+- The semester calendar switched too (centred over the calendar, ~1s after it opens), so
+  nothing uses the arrow any more and `ScrollCue` is deleted.
+
+### 2026-09-24 — New flow: Build a study notebook (student)
+Reference: `~/Downloads/Study notebook/` (screenshots 2026-09-24, 4.15–4.17 PM).
+- **What it is:** a NotebookLM-style "Gemini Notebook" (`StudyNotebook.tsx`, content in
+  `STUDY_NOTEBOOK` in `types.ts`), in the same 42cqw column as every other answer, with its
+  own input where the Ask Gemini bar would be; the bar stays parked the whole demo. The
+  rundown pill is now live and opens straight onto the notebook.
+- **Beats:** (1) Sources, empty — setup prompt types in, tap Send. (2) "Responding…"; sources
+  land one at a time, each checking itself, then Select all; the count climbs 0 → 4. (3) Moves
+  itself to Chat; the exam prompt types in, "Tap send to ask." appears, tap Send. (4) The study
+  guide streams in heading by heading (citations land with their heading), then its source list,
+  then the disclaimer and "Start the Biology quiz". (5) Studio: the quiz and Audio Overview
+  load in one after the other; "Back to your rundown" + QR arrive with it.
+- **Studio:** tap the card to flip it (3D) — each card counts as answered the first time its
+  answer is seen, ending on "Quiz complete · 6 of 6"; arrows move between cards and dim at
+  the ends. Audio Overview's play button (pulsing until used) types out the three-line
+  transcript.
+- **Display only:** the tabs, the stop button, the citation chips.
+- **Assets:** `products/notebooklm.svg` (logo), `wb-bio2.jpg` / `wb-bio.jpg` (the two class-notes
+  thumbnails); the doc glyph is drawn inline.
+- **Placeholder copy (awaiting real text):** Q3–Q6 and A2–A5, marked `PLACEHOLDER` in
+  `STUDY_NOTEBOOK.quiz`.
+- **Shared:** "Start the Biology quiz" and "Back to your rundown" are now one component,
+  `GradientPillButton` in `shared.tsx`.
+- Not carried over: the reference's "FPO" chip — there's no stand-in photo on these screens.

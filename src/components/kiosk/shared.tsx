@@ -129,6 +129,7 @@ export function PulseRings({
   active,
   radius = "9999px",
   count = 2,
+  spread,
   children,
 }: {
   active: boolean;
@@ -136,6 +137,9 @@ export function PulseRings({
   radius?: string;
   /** How many rings are in flight at once, evenly spread across one cycle. */
   count?: number;
+  /** For a button that isn't round: how far (cqw) each ring travels out, the same on every
+   * side, instead of scaling with the button. Left unset, rings scale (right for a circle). */
+  spread?: number;
   children: ReactNode;
 }) {
   return (
@@ -146,11 +150,14 @@ export function PulseRings({
             key={i}
             aria-hidden
             className="pointer-events-none absolute inset-0 border-[0.1cqw] border-white"
-            style={{
-              borderRadius: radius,
-              animation: `pulse-ring ${PULSE_RING_DURATION_MS}ms ease-out infinite`,
-              animationDelay: `${(i * PULSE_RING_DURATION_MS) / count}ms`,
-            }}
+            style={
+              {
+                borderRadius: radius,
+                "--spread": spread === undefined ? undefined : `${spread}cqw`,
+                animation: `${spread === undefined ? "pulse-ring" : "pulse-ring-spread"} ${PULSE_RING_DURATION_MS}ms ease-out infinite`,
+                animationDelay: `${(i * PULSE_RING_DURATION_MS) / count}ms`,
+              } as CSSProperties
+            }
           />
         ))}
       {/* positioned (and later in DOM order) so it paints over the rings — a positioned
@@ -164,8 +171,8 @@ export function PulseRings({
 }
 
 /**
- * "There is more below this box" for any scroll container, plus the floating down-arrow
- * that says so. Nothing in this app auto-scrolls — a visitor has to swipe — so on a
+ * "There is more below this box" for any scroll container; `RisingDotsCue` below is
+ * what says so. Nothing in this app auto-scrolls — a visitor has to swipe — so on a
  * touchscreen the cue is the only thing telling them the answer continues past the fold.
  *
  * Watches both directions: the visitor scrolling, and the content growing underneath them
@@ -205,11 +212,52 @@ export function useScrollCue(scrollRef: RefObject<HTMLDivElement | null>, innerR
 }
 
 /**
- * The cue itself — a circular down arrow that doubles as a tap target to jump forward,
- * since on a kiosk a chevron nobody can press is just decoration. `size` is the button's
- * diameter in cqw; the caller positions it, because where it sits differs per surface (a
- * full-height column, a floating overlay). Faded rather than unmounted so it can't pop
- * in and out as content reveals.
+ * Whether the visitor has scrolled this answer yet — latched on the first real scroll, so
+ * the rising-dots cue stops once it has done its job. Re-armed whenever `armed` changes
+ * (a new answer opening or an old one closing, or a flow moving to its next screen), adjusted during render rather than in an
+ * effect so the cue never shows a frame of the previous answer's "already scrolled". The
+ * small threshold keeps a caller's own reset to the top from counting as the visitor's.
+ */
+export function useScrolledOnce(scrollRef: RefObject<HTMLDivElement | null>, armed: unknown) {
+  const [scrolled, setScrolled] = useState(false);
+  const [prevArmed, setPrevArmed] = useState(armed);
+  if (armed !== prevArmed) {
+    setPrevArmed(armed);
+    setScrolled(false);
+  }
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (el.scrollTop > 8) setScrolled(true);
+    };
+    el.addEventListener("scroll", onScroll);
+    return () => el.removeEventListener("scroll", onScroll);
+    // refs are stable for the life of the component, so this runs once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return scrolled;
+}
+
+// RisingDotsCue geometry in cqw; the dots' travel is whatever the pill leaves them after its padding
+const CUE_W = 3;
+const CUE_H = 12;
+const CUE_DOT = 1.3;
+const CUE_PAD = (CUE_W - CUE_DOT) / 2;
+const CUE_TRAVEL = CUE_H - 2 * CUE_PAD - CUE_DOT;
+const CUE_CYCLE_MS = 2400;
+// leader first and brightest, each follower dimmer, so the bunch at the top reads as a
+// trail catching up rather than four equal dots
+const CUE_DOTS = ["#ffffff", "#d2d2d4", "#9d9da2", "#6c6c72"];
+
+/**
+ * The demo's scroll cue: a glassy vertical pill with dots rising up it, looping until the
+ * visitor scrolls (see `useScrolledOnce`). Used wherever something scrolls — Gemini's
+ * floating panel, the full-frame text answers, the semester calendar. The caller positions
+ * it, centred over what it belongs to. Faded rather than unmounted so it can't pop in and
+ * out as content reveals.
  *
  * `show` must also account for whether the surface this cue belongs to is the one on
  * screen, not just whether it has more to scroll. `pointer-events: auto` re-enables
@@ -218,45 +266,68 @@ export function useScrollCue(scrollRef: RefObject<HTMLDivElement | null>, innerR
  * whatever is now in front of it — which is exactly what a hidden-but-still-mounted
  * response pattern is.
  */
-export function ScrollCue({
-  show,
-  onClick,
-  size = 3.6,
-  className,
-}: {
-  show: boolean;
-  onClick: () => void;
-  /** Diameter in cqw. */
-  size?: number;
-  /** Positioning and surface colors — everything that differs per placement. */
-  className?: string;
-}) {
+export function RisingDotsCue({ show, onClick }: { show: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label="Scroll for more"
       tabIndex={show ? 0 : -1}
-      className={`flex items-center justify-center rounded-full border text-white transition-opacity duration-300 ${className ?? ""}`}
+      className="relative block overflow-hidden rounded-full border border-white/25 backdrop-blur-md transition-opacity duration-300"
       style={{
-        height: `${size}cqw`,
-        width: `${size}cqw`,
+        // the glass sheen sits on a dark base: centred in the panel, the cue often lands on
+        // the light map, and a sheen alone turns milky there and swallows the white dots
+        background: "linear-gradient(to bottom, rgba(255,255,255,0.18), rgba(255,255,255,0.05)), rgba(22,22,26,0.78)",
+        width: `${CUE_W}cqw`,
+        height: `${CUE_H}cqw`,
         opacity: show ? 1 : 0,
         pointerEvents: show ? "auto" : "none",
       }}
     >
-      <svg
-        viewBox="0 0 24 24"
-        style={{ height: `${size * 0.45}cqw`, width: `${size * 0.45}cqw` }}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M6 9l6 6 6-6" />
-      </svg>
+      {/* reversed so the leader paints last and sits on top of the bunch it arrives into */}
+      {CUE_DOTS.map((color, i) => ({ color, i })).reverse().map(({ color, i }) => (
+        <span
+          key={i}
+          aria-hidden
+          className="absolute rounded-full"
+          style={
+            {
+              // centred off the pill's midline rather than offset by CUE_PAD: absolute
+              // children measure from inside the border, so a CUE_PAD offset lands the
+              // dot a border-width right of centre
+              left: "50%",
+              marginLeft: `${-CUE_DOT / 2}cqw`,
+              top: `${CUE_PAD}cqw`,
+              width: `${CUE_DOT}cqw`,
+              height: `${CUE_DOT}cqw`,
+              backgroundColor: color,
+              "--travel": `${CUE_TRAVEL}cqw`,
+              animation: show ? `scroll-dot-${i + 1} ${CUE_CYCLE_MS}ms ease-in-out infinite` : "none",
+            } as CSSProperties
+          }
+        />
+      ))}
     </button>
+  );
+}
+
+/**
+ * The demo's primary call to action — "Back to your rundown", "Start the Biology quiz":
+ * the design's blue gradient pill (brighter at the ends than just left of centre), with
+ * rings stepping out a fixed distance on every side so they keep an even gap around a
+ * pill far wider than it is tall.
+ */
+export function GradientPillButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <PulseRings active spread={1.4}>
+      <button
+        type="button"
+        onClick={onClick}
+        className="pointer-events-auto rounded-full bg-[linear-gradient(90deg,#4a82f6_0%,#436feb_40%,#6199f6_100%)] px-[1.8cqw] py-[1cqw] text-[1.2cqw] font-medium whitespace-nowrap text-white active:brightness-90"
+      >
+        {children}
+      </button>
+    </PulseRings>
   );
 }
 
@@ -403,9 +474,12 @@ export function PromptBubble({ lines, size = 1 }: { lines: string[]; size?: numb
   );
 }
 
-function SectionHeading({ children, size = 1 }: { children: ReactNode; size?: number }) {
+function SectionHeading({ children, size = 1, plain = false }: { children: ReactNode; size?: number; plain?: boolean }) {
   return (
-    <p className="font-bold text-white" style={{ fontSize: `${1.47 * size}cqw`, lineHeight: `${2.06 * size}cqw` }}>
+    <p
+      className={plain ? "font-normal text-[#e3e3e3]" : "font-bold text-white"}
+      style={{ fontSize: `${(plain ? 1.55 : 1.47) * size}cqw`, lineHeight: `${2.06 * size}cqw` }}
+    >
       {children}
     </p>
   );
@@ -428,15 +502,41 @@ function SectionItem({ section, lines, size = 1 }: { section: Section; lines: st
 
 /** A bulleted fact with a bold lead-in ("Getting there: …"). Unlike `SectionItem` the
  * text is one whole sentence that wraps to whatever width it's given — the design files
- * author these as prose, not as pre-broken display lines. */
-function LabelledBullet({ bullet, size = 1 }: { bullet: PlaceBullet; size?: number }) {
+ * author these as prose, not as pre-broken display lines. `number` swaps the hollow bullet
+ * for "1." and so on; `children` nest one level in, under the text rather than the marker. */
+function LabelledBullet({ bullet, number, size = 1 }: { bullet: PlaceBullet; number?: number; size?: number }) {
   return (
     <div className="flex text-white" style={{ gap: `${0.7 * size}cqw`, fontSize: `${1.25 * size}cqw`, lineHeight: `${1.8 * size}cqw` }}>
-      <Bullet size={0.55 * size} />
-      <span>
-        <span className="font-medium">{bullet.label}</span> {bullet.text}
-      </span>
+      {number === undefined ? (
+        <Bullet size={0.55 * size} />
+      ) : (
+        <span className="shrink-0 tabular-nums" style={{ minWidth: `${1.3 * size}cqw` }}>
+          {number}.
+        </span>
+      )}
+      <div className="flex min-w-0 flex-col" style={{ gap: `${0.6 * size}cqw` }}>
+        <span>
+          {bullet.label && <span className="font-medium">{bullet.label}</span>}
+          {bullet.label && bullet.text ? " " : null}
+          {bullet.text}
+        </span>
+        {bullet.children?.map((child, i) => (
+          <LabelledBullet key={i} bullet={child} size={size} />
+        ))}
+      </div>
     </div>
+  );
+}
+
+/** A paragraph under a place card that opens on the place's name gets the name
+ * dotted-underlined, like a link back to the card — the design's own treatment. */
+function PlaceParagraph({ text, name }: { text: string; name?: string }) {
+  if (!name || !text.startsWith(name)) return <p>{text}</p>;
+  return (
+    <p>
+      <span className="underline decoration-white/60 decoration-dotted underline-offset-[0.35cqw]">{name}</span>
+      {text.slice(name.length)}
+    </p>
   );
 }
 
@@ -460,90 +560,109 @@ function PlaceCardRow({ place, size = 1 }: { place: PlaceCard; size?: number }) 
 
       <div className="flex min-w-0 flex-col justify-center" style={{ gap: `${0.1 * size}cqw` }}>
         <span style={{ fontSize: `${1.25 * size}cqw`, lineHeight: `${1.77 * size}cqw`, color: "#e0e0e0" }}>{place.name}</span>
-        <span className="flex items-center" style={{ ...dim, gap: `${0.25 * size}cqw` }}>
-          <span style={{ color: "#e0e0e0" }}>{place.rating}</span>
-          <svg
-            viewBox="0 0 24 24"
-            style={{ height: `${0.96 * size}cqw`, width: `${0.96 * size}cqw`, color: "#e0e0e0" }}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinejoin="round"
-          >
-            <path d="M12 3l2.7 5.8 6.3.8-4.6 4.3 1.2 6.2L12 17.8 6.4 20.1l1.2-6.2L3 9.6l6.3-.8z" />
-          </svg>
-          <span style={{ color: "#8d8d8d" }}>{place.meta}</span>
-        </span>
-        <span style={{ ...dim, color: "#8d8d8d" }}>📍 {place.address}</span>
-        <span style={dim}>
-          <span className="font-bold" style={{ color: "#0ebc5f" }}>
-            {place.status}
-          </span>{" "}
-          <span style={{ color: "#8d8d8d" }}>{place.statusTail}</span>
-        </span>
-        <span style={{ ...dim, color: "#8d8d8d" }}>{place.note}</span>
+        {place.rating && (
+          <span className="flex items-center" style={{ ...dim, gap: `${0.25 * size}cqw` }}>
+            <span style={{ color: "#e0e0e0" }}>{place.rating}</span>
+            <svg
+              viewBox="0 0 24 24"
+              style={{ height: `${0.96 * size}cqw`, width: `${0.96 * size}cqw`, color: "#e0e0e0" }}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinejoin="round"
+            >
+              <path d="M12 3l2.7 5.8 6.3.8-4.6 4.3 1.2 6.2L12 17.8 6.4 20.1l1.2-6.2L3 9.6l6.3-.8z" />
+            </svg>
+            {place.meta && <span style={{ color: "#8d8d8d" }}>{place.meta}</span>}
+          </span>
+        )}
+        {place.address && <span style={{ ...dim, color: "#8d8d8d" }}>📍 {place.address}</span>}
+        {place.status && (
+          <span style={dim}>
+            <span style={{ color: place.statusTone === "closed" ? "#e9bab6" : "#56b969" }}>{place.status}</span>
+            {place.statusTail && <span style={{ color: "#8d8d8d" }}> {place.statusTail}</span>}
+          </span>
+        )}
+        {place.note && <span style={{ ...dim, color: "#8d8d8d" }}>{place.note}</span>}
       </div>
     </div>
   );
 }
 
 /**
- * The map that heads an answer covering several places — a Google Maps still with a pin
- * per venue. The ground image and the road overlay are two separate exports layered in
- * that order, as the design draws them; pins are placed as fractions of the card's own
- * box so it scales to any column width without re-measuring anything.
+ * The Google Maps card that heads an answer about several places: a still with a pin and a
+ * name chip per place, and optionally the drive between them. The box is its own size
+ * container, so every measurement inside is a share of the map's width (`cqw` here means
+ * the map, not the kiosk frame) — taken off the design at that scale, and it holds at
+ * whatever width the column gives it. Radius is the caller's, since that's the one thing
+ * measured against the kiosk.
  */
-function MapCardBlock({ map, size = 1 }: { map: MapCard; size?: number }) {
+export function PinnedMap({ map, radius = "1.4cqw" }: { map: MapCard; radius?: string }) {
+  const pinColor = map.pinColor ?? "#4A84F7";
   return (
     <div
-      className="relative w-full overflow-hidden bg-[#0b0c10]"
-      style={{ aspectRatio: `${map.aspectRatio}`, borderRadius: `${1.78 * size}cqw` }}
+      className="relative w-full overflow-hidden [container-type:inline-size]"
+      style={{ aspectRatio: `${map.aspectRatio}`, borderRadius: radius }}
     >
-      {/* object-top, not centered: the design clips this panel from the bottom (a 370.09
-          tall map shown in a 316.66 window), so centering the crop would shave the top too */}
+      {/* object-top: when the still is taller than the card, what matters sits in its
+          upper part */}
       <img src={map.image} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
-      <img src={map.overlay} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
+
+      {map.route && (
+        // one unit per 0.1% of the width on both axes, so the stroke keeps its weight
+        <svg
+          viewBox={`0 0 1000 ${1000 / map.aspectRatio}`}
+          className="absolute inset-0 h-full w-full"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points={routePoints(map)} stroke="#2C59B6" strokeWidth={11} />
+          <polyline points={routePoints(map)} stroke="#5383EC" strokeWidth={7} />
+        </svg>
+      )}
 
       {map.pins.map((pin) => (
         <div key={pin.label} className="absolute" style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}>
-          <div className="relative" style={{ height: `${3.15 * size}cqw`, width: `${3.15 * size}cqw`, marginLeft: `${-1.58 * size}cqw`, marginTop: `${-3.15 * size}cqw` }}>
-            <img src="/gemini/band-tour/map-pin.svg" alt="" className="h-full w-full" />
-            {/* the chip hangs off whichever side keeps it inside the card — with two pins
-                this close together, both hanging the same way would overlap */}
-            <span
-              className="absolute flex items-center whitespace-nowrap rounded-full bg-black/72 text-white"
-              style={{
-                height: `${3.87 * size}cqw`,
-                borderRadius: `${1.04 * size}cqw`,
-                paddingLeft: `${1.33 * size}cqw`,
-                paddingRight: `${1.33 * size}cqw`,
-                fontSize: `${1.0 * size}cqw`,
-                [pin.side === "right" ? "left" : "right"]: `${3.9 * size}cqw`,
-                [pin.vAlign === "below" ? "top" : "bottom"]: `${0.2 * size}cqw`,
-              }}
-            >
-              {pin.label}
-            </span>
-          </div>
+          {/* Google's teardrop with a white dot, anchored at the head's centre so the chip
+              beside it can centre on the same point */}
+          <svg viewBox="0 0 24 32" className="absolute h-[5.1cqw] w-[3.8cqw] -translate-x-1/2" style={{ top: "-1.9cqw" }}>
+            <path d="M12 0C5.4 0 0 5.2 0 11.7 0 20.4 12 32 12 32s12-11.6 12-20.3C24 5.2 18.6 0 12 0z" fill={pinColor} />
+            <circle cx="12" cy="11.7" r="4.2" fill="#fff" />
+          </svg>
+          <span
+            className="absolute flex h-[8cqw] -translate-y-1/2 items-center whitespace-nowrap rounded-[1.3cqw] bg-[#2d3135]/90 px-[2.25cqw] text-[2.7cqw] text-white"
+            style={{ [pin.side === "right" ? "left" : "right"]: "4.4cqw" }}
+          >
+            {pin.label}
+          </span>
         </div>
       ))}
 
-      <span
-        className="absolute"
-        style={{ left: `${0.78 * size}cqw`, bottom: `${0.92 * size}cqw`, fontSize: `${0.96 * size}cqw`, color: "rgba(0,0,0,0.55)" }}
-      >
-        Google Maps
-      </span>
-      {/* the design's own fullscreen chip, exported whole — it's a shaded disc with the
-          glyph baked in, not a flat icon that could be dropped onto a background here */}
-      <img
-        src="/gemini/band-tour/map-expand.png"
-        alt=""
-        className="absolute"
-        style={{ right: `${0.78 * size}cqw`, top: `${0.78 * size}cqw`, height: `${5.32 * size}cqw`, width: `${5.32 * size}cqw` }}
-      />
+      <span className="absolute bottom-[2.2cqw] left-[1.9cqw] text-[3.2cqw] leading-none text-[#5f6368]">Google Maps</span>
+      {/* the fullscreen chip: the exported disc carries no glyph, so the two corner
+          brackets are drawn over it */}
+      <div className="absolute right-[3.5cqw] top-[2.7cqw] flex h-[10cqw] w-[10cqw] items-center justify-center">
+        <img src="/gemini/band-tour/map-expand.png" alt="" className="absolute inset-0 h-full w-full" />
+        <svg
+          viewBox="0 0 24 24"
+          className="relative h-[4.4cqw] w-[4.4cqw]"
+          fill="none"
+          stroke="white"
+          strokeWidth={2.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M14 4h6v6M10 20H4v-6" />
+        </svg>
+      </div>
     </div>
   );
+}
+
+function routePoints(map: MapCard) {
+  const h = 1000 / map.aspectRatio;
+  return map.route!.map(([x, y]) => `${x * 1000},${y * h}`).join(" ");
 }
 
 // generic line-icon props shared by every glyph in the footer row, matching the app's existing
@@ -636,19 +755,25 @@ export function buildContentBlocks(content: ResponseContent, size = 1): ContentB
   // the map heads the answer, above even the intro — it's the answer's "here is where all
   // of this is" before any of the prose
   if (content.map) {
-    blocks.push({ id: "map", isHeading: true, node: <MapCardBlock map={content.map} size={size} /> });
+    blocks.push({ id: "map", isHeading: true, node: <PinnedMap map={content.map} radius={`${1.78 * size}cqw`} /> });
   }
 
   // joined into one flowing paragraph rather than one <p> per authored line —
   // `introLines` is just how the intro is authored as data, not where it should wrap
-  blocks.push({ id: "intro", isHeading: true, node: <p>{content.introLines.join(" ")}</p> });
+  if (content.introLines?.length) {
+    blocks.push({ id: "intro", isHeading: true, node: <p>{content.introLines.join(" ")}</p> });
+  }
 
   content.sections.forEach((section) => {
     blocks.push({
       id: `${section.id}-heading`,
       isHeading: true,
       keepWithNext: true,
-      node: <SectionHeading size={size}>{section.heading}</SectionHeading>,
+      node: (
+        <SectionHeading size={size} plain={content.plainHeadings}>
+          {section.heading}
+        </SectionHeading>
+      ),
     });
 
     if (section.place) {
@@ -661,11 +786,15 @@ export function buildContentBlocks(content: ResponseContent, size = 1): ContentB
 
     // each paragraph is its own block so a column split can fall between two of them
     section.body?.forEach((para, i) => {
-      blocks.push({ id: `${section.id}-body-${i}`, isHeading: true, node: <p>{para}</p> });
+      blocks.push({ id: `${section.id}-body-${i}`, isHeading: true, node: <PlaceParagraph text={para} name={section.place?.name} /> });
     });
 
     section.bullets?.forEach((bullet, i) => {
-      blocks.push({ id: `${section.id}-bullet-${i}`, isHeading: false, node: <LabelledBullet bullet={bullet} size={size} /> });
+      blocks.push({
+        id: `${section.id}-bullet-${i}`,
+        isHeading: false,
+        node: <LabelledBullet bullet={bullet} number={section.numbered ? i + 1 : undefined} size={size} />,
+      });
     });
 
     // the older pre-broken shape (the weekend answer); a section uses one list form or the other

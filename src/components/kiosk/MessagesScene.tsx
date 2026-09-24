@@ -26,11 +26,10 @@ export const PHONE_COLUMN = "46cqw";
  * The Messages app is drawn on its own surface rather than floating on the kiosk's black:
  * a lighter header strip with rounded top corners, and a darker body sheet under it holding
  * the thread, the suggestion chip and the RCS bar. Both are wider than the content column
- * they wrap, and the body is wider than the header by a hair — that is measured off the
- * design, not a rounding slip, so don't "fix" the two to match.
+ * they wrap and share one width, and only the body's bottom corners are rounded, so the
+ * two read as a single surface with no notch or overhang at the seam.
  */
-const HEADER_PANEL = "49.2cqw";
-const BODY_PANEL = "49.7cqw";
+const PANEL_WIDTH = "49.7cqw";
 const PANEL_RADIUS = "2.7cqw";
 /** Gap from the RCS bar's bottom edge down to the body sheet's. Chosen so the bar still
  * rests exactly where the kiosk's own Gemini compose bar does (2.98cqw off the frame's
@@ -99,7 +98,7 @@ function MessagesHeader() {
   return (
     <div
       className="flex h-[5cqw] shrink-0 items-center gap-[0.94cqw] bg-[#201f23] pl-[2cqw]"
-      style={{ width: HEADER_PANEL, borderRadius: `${PANEL_RADIUS} ${PANEL_RADIUS} 0 0` }}
+      style={{ width: PANEL_WIDTH, borderRadius: `${PANEL_RADIUS} ${PANEL_RADIUS} 0 0` }}
     >
       <Icon paths={ARROW_BACK} className="h-[1.87cqw] w-[1.87cqw] shrink-0 text-[#e4e1e7]" />
       <div className="grid shrink-0 grid-cols-2 gap-[0.1cqw]" style={{ width: "3.13cqw", height: "3.13cqw" }}>
@@ -216,7 +215,7 @@ function AnimatedThread({
 /**
  * The "go out" branch's entry point — a Gemini Intelligence suggestion surfaced
  * inline in the group chat, standing in for how a real device would proactively
- * notice "sushi" and "gluten free" in the thread. Styled and positioned as part of
+ * notice "vegetarian options" in the thread. Styled and positioned as part of
  * the thread itself (right-aligned, like the user's own messages) rather than a
  * separate floating card, and replaces the usual idle "Ask Gemini" pill for this one
  * branch: tapping it is what kicks off the compose bar.
@@ -297,30 +296,49 @@ function MessagesComposeBar({ show }: { show: boolean }) {
  * conversations) rather than being hardcoded here, and grows at the end of the go out
  * flow when Gemini drafts the plan back in. `suggestion` (shown once the thread has
  * finished) renders as one more entry in the same thread, not a separate overlay.
+ * `dimmed` lays a dark wash over the whole app, header included, once Gemini takes the
+ * foreground — the chat stays readable behind it but clearly steps back.
  */
 export default function MessagesScene({
   active,
   messages,
   suggestion,
   showComposeBar = false,
+  dimmed = false,
 }: {
   active: boolean;
   messages: ChatBubble[];
   suggestion?: { show: boolean; onClick: () => void; title: string };
   showComposeBar?: boolean;
+  dimmed?: boolean;
 }) {
   return (
     <div
-      className="flex h-full flex-col items-center pt-[1cqw]"
+      className="relative flex h-full flex-col items-center pt-[1cqw]"
       style={{ paddingBottom: `${SHEET_BOTTOM_CQW}cqw` }}
     >
+      {/* Sized to the app's own surface (same padding as this column, same width and
+          corners as the panels) so the wash covers the Messages UI and nothing else. Last
+          in the tree, so it sits over the thread, the chip and the RCS bar; Gemini's
+          compose bar and answer panel live outside this scene and stay bright above it. */}
+      <div
+        className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 bg-black/60 transition-opacity duration-500"
+        style={{
+          top: "1cqw",
+          bottom: `${SHEET_BOTTOM_CQW}cqw`,
+          width: PANEL_WIDTH,
+          borderRadius: PANEL_RADIUS,
+          opacity: dimmed ? 1 : 0,
+        }}
+      />
+
       <MessagesHeader />
 
       {/* the sheet is the positioning context for everything anchored to the app's bottom
           edge — the RCS bar and the suggestion chip above it */}
       <div
         className="relative flex min-h-0 flex-1 flex-col items-center overflow-hidden bg-[#141317] pt-[1.5cqw]"
-        style={{ width: BODY_PANEL, borderRadius: PANEL_RADIUS }}
+        style={{ width: PANEL_WIDTH, borderRadius: `0 0 ${PANEL_RADIUS} ${PANEL_RADIUS}` }}
       >
         <div className="flex flex-col gap-[1cqw]" style={{ width: PHONE_COLUMN }}>
           {/* remounting on `active` is what rewinds the thread for the next run-through */}

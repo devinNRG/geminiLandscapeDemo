@@ -4,8 +4,8 @@ import { BackButton, FpoChip } from "./shared";
 
 /**
  * Sits between picking the "Sort Friday night" pill and playing a demo — the
- * use case branches into two: "Go out" (a local-search flow — nearby sushi
- * spots, ending with Gemini drafting a plan into the group chat) and "Stay
+ * use case branches into two: "Go out" (a local-search flow — nearby vegetarian
+ * restaurants, ending with Gemini drafting a plan into the group chat) and "Stay
  * in" (the FoodOrder task-automation flow).
  */
 export default function FridayNightChoiceScreen({

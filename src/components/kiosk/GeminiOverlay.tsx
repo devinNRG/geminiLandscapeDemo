@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { ScrollCue, useScrollCue } from "./shared";
+import { RisingDotsCue, useScrollCue, useScrolledOnce } from "./shared";
 
 /**
  * The panel Gemini answers into, floating over the messaging app rather than
@@ -14,8 +14,9 @@ import { ScrollCue, useScrollCue } from "./shared";
  * point of the overlay, so the panel is never allowed to become the full screen.
  *
  * Long answers scroll inside. Nothing auto-scrolls: a visitor has to swipe, so the
- * down-arrow cue below is the only thing telling them there's more than one result
- * down there. It mirrors ScrollPattern's cue, including doubling as a tap target.
+ * rising-dots cue below is the only thing telling them there's more than one result
+ * down there. It loops until they scroll for the first time — by then it has done its
+ * job — and doubles as a tap target.
  */
 
 // clearances measured from the middle area's own box (which starts under the Messages
@@ -23,10 +24,21 @@ import { ScrollCue, useScrollCue } from "./shared";
 const BOTTOM_CQW = 11.75; // leaves the collapsed compose pill clear beneath the panel
 const TOP_GAP_CQW = 8; // keeps the first couple of chat bubbles visible above the panel
 
-export default function GeminiOverlay({ show, children }: { show: boolean; children: ReactNode }) {
+export default function GeminiOverlay({
+  show,
+  cueReady = true,
+  children,
+}: {
+  show: boolean;
+  /** Holds the scroll cue back until the caller's content has landed, so the cue follows
+   * the answer on screen instead of arriving with it. */
+  cueReady?: boolean;
+  children: ReactNode;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const { hasMore, scrollForward } = useScrollCue(scrollRef, innerRef);
+  const scrolled = useScrolledOnce(scrollRef, show);
 
   // a fresh answer starts at the top rather than wherever the last one was left
   useEffect(() => {
@@ -73,8 +85,10 @@ export default function GeminiOverlay({ show, children }: { show: boolean; child
         </div>
       </div>
 
-      <div className="absolute bottom-[1.1cqw] left-1/2 -translate-x-1/2">
-        <ScrollCue show={show && hasMore} onClick={scrollForward} size={2.8} className="border-white/12 bg-[#1b1b20]" />
+      {/* dead centre of the panel, over the answer itself — it's a swipe cue, so it sits
+          where the swipe would start rather than tucked into a corner */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        <RisingDotsCue show={show && cueReady && hasMore && !scrolled} onClick={scrollForward} />
       </div>
     </div>
   );

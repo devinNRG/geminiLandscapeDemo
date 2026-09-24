@@ -9,10 +9,12 @@ import { useEffect, useState } from "react";
  * vertex each dot occupies, then collapse back to a row and repeat.
  * `captions` cycles underneath, mirroring how Gemini's subtext names
  * whatever it's actually doing (reading a doc, checking a connected app).
+ * `icon` puts that app's logo ahead of the caption, for a beat that names one app
+ * ("Connecting to Google Maps…") rather than cycling through steps.
  */
 const CYCLE = "3.4s";
 
-export default function ThinkingIndicator({ captions }: { captions: string[] }) {
+export default function ThinkingIndicator({ captions, icon }: { captions: string[]; icon?: string }) {
   const [captionIndex, setCaptionIndex] = useState(0);
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function ThinkingIndicator({ captions }: { captions: string[] }) 
           />
         </div>
       </div>
+      {icon && <img src={icon} alt="" className="h-[1.5cqw] w-auto shrink-0" />}
       <span className="text-[1.1cqw] text-muted">{captions[captionIndex]}</span>
     </div>
   );
