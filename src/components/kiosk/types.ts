@@ -268,7 +268,148 @@ export const BAND_TOUR_RESPONSE: ResponseContent = {
   ],
 };
 
-export type PatternId = "scroll" | "measuredColumns";
+/**
+ * "Organize my semester" — the student's agentic flow. Unlike the Friday-night task (which
+ * hands off to a third-party checkout) this one ends inside a Google app: Gemini reads the
+ * syllabuses out of Drive and writes the whole term into Calendar, and the payoff is the
+ * filled-in calendar itself.
+ */
+
+/** One row of the "Thinking it through…" rail. `thought` rows are Gemini narrating what it
+ * is doing; `app` rows name the tool it reached for (and carry that app's own mark, which is
+ * what makes the rail read as real work rather than as a loading message); the single `done`
+ * row ends it. */
+export type ThinkingStep =
+  | { kind: "thought"; text: string }
+  | { kind: "app"; app: "drive" | "calendar"; text: string }
+  | { kind: "done"; text: string };
+
+/**
+ * What kind of thing a calendar chip is, rather than what color it should be — the palette
+ * lives with the component that draws it. Eight tones, because that's what the design uses
+ * to make a dense month legible at a glance: you can see the exam weeks and the study blocks
+ * without reading a single label.
+ */
+export type CalendarTone =
+  | "class" // a recurring lecture — the periwinkle that fills most of the term
+  | "study" // a block Gemini added, which is the whole point of the demo
+  | "due" // an assignment or quiz deadline lifted off a syllabus
+  | "exam" // midterms and the final
+  | "band" // the student's other life: rehearsals and gigs
+  | "filming"
+  | "media" // posting the footage from a filming day
+  | "spark";
+
+export type CalendarEvent = {
+  day: number;
+  label: string;
+  tone: CalendarTone;
+};
+
+export type CalendarMonth = {
+  name: string;
+  /** Weekday the 1st falls on, 0 = Sunday, so the grid can lead with the right blanks. */
+  startWeekday: number;
+  /** How many days the grid draws. This is the semester window, not the real month —
+   * November stops a week after the final rather than running to the 30th, because the
+   * story is over by then and the empty rows would only push the grid off the frame. */
+  days: number;
+  events: CalendarEvent[];
+};
+
+export type SemesterPlanContent = {
+  promptLines: string[];
+  steps: ThinkingStep[];
+  /** Echoed above the calendar once it opens, with the "Complete" chip beside it. */
+  title: string;
+  months: CalendarMonth[];
+};
+
+/** Compact authoring for the month grids below — they are long enough as it is. */
+const ev = (day: number, label: string, tone: CalendarTone): CalendarEvent => ({ day, label, tone });
+
+export const SEMESTER_PLAN: SemesterPlanContent = {
+  promptLines: [
+    "Look at my syllabuses in Google Drive and add the",
+    "exam and assignment due dates to my calendar.",
+  ],
+  steps: [
+    { kind: "thought", text: "Opening the Drive folder: the course syllabuses." },
+    { kind: "app", app: "drive", text: "Google Drive" },
+    {
+      kind: "thought",
+      text: "Extracting the dates: 23 due dates and 6 exams, Quiz 2 on October 13, the final on November 10.",
+    },
+    { kind: "app", app: "calendar", text: "Google Calendar" },
+    {
+      kind: "thought",
+      text: "Putting every exam and assignment due date on the calendar, with study sessions blocked around the filming days.",
+    },
+    { kind: "app", app: "calendar", text: "Google Calendar" },
+    { kind: "thought", text: "Finalizing the calendar." },
+    { kind: "done", text: "Task complete" },
+  ],
+  title: "Organize my semester",
+  months: [
+    {
+      name: "October",
+      startWeekday: 1,
+      days: 31,
+      events: [
+        ev(1, "Chem 14A", "class"), ev(1, "Stats 10", "class"),
+        ev(2, "Bio 101", "class"), ev(2, "Post reel", "media"),
+        ev(3, "Chem 14A", "class"), ev(3, "Band", "band"),
+        ev(4, "Bio 101", "class"), ev(4, "Stats 10", "class"),
+        ev(5, "Chem 14A", "class"), ev(5, "Filming", "filming"),
+        ev(6, "Shakespeare", "class"), ev(6, "Post reel", "media"),
+        ev(7, "Band", "band"), ev(7, "Spark 8:00", "spark"),
+        ev(8, "Chem 14A", "class"), ev(8, "Read Othello", "study"),
+        ev(9, "Bio 101", "class"), ev(9, "Post reel", "media"),
+        ev(10, "Chem 14A", "class"), ev(10, "Band", "band"),
+        ev(11, "Bio 101", "class"), ev(11, "Stats 10", "class"),
+        ev(12, "Chem 14A", "class"), ev(12, "Filming", "filming"),
+        ev(13, "Shakes quiz", "due"), ev(13, "Post reel", "media"),
+        ev(14, "Band", "band"), ev(14, "Spark 8:00", "spark"),
+        ev(15, "Chem 14A", "class"), ev(15, "Stats 10", "class"),
+        ev(16, "Poster due", "due"), ev(16, "Bio 101", "class"),
+        ev(17, "Othello essay", "due"), ev(17, "Chem 14A", "class"),
+        ev(18, "Filming", "filming"), ev(18, "Bio 101", "class"),
+        ev(19, "Study Chem", "study"), ev(19, "Chem 14A", "class"),
+        ev(20, "Lab due", "due"), ev(20, "Shakespeare", "class"),
+        ev(21, "Band", "band"), ev(21, "Spark 8:00", "spark"),
+        ev(22, "Stats quiz", "due"), ev(22, "Stats 10", "class"),
+        ev(23, "Read Macbeth", "study"), ev(23, "Post reel", "media"),
+        ev(24, "Paper due", "due"), ev(24, "Band", "band"),
+        ev(25, "Filming", "filming"), ev(25, "Study Chem", "study"),
+        ev(26, "Midterm", "exam"), ev(26, "Copper Owl", "band"),
+        ev(27, "Marlin gig", "band"), ev(27, "Post reel", "media"),
+        ev(28, "Study Stats", "study"), ev(28, "Spark 8:00", "spark"),
+        ev(29, "Midterm", "exam"), ev(29, "Stats 10", "class"),
+        ev(30, "Bio 101", "class"), ev(30, "Post reel", "media"),
+        ev(31, "Chem 14A", "class"), ev(31, "Band", "band"),
+      ],
+    },
+    {
+      name: "November",
+      startWeekday: 4,
+      days: 17,
+      events: [
+        ev(2, "Chem 14A", "class"), ev(2, "Study block", "study"),
+        ev(3, "Bio 101", "class"), ev(3, "Study block", "study"),
+        ev(4, "Stats 10", "class"), ev(4, "Study block", "study"),
+        ev(5, "Chem 14A", "class"), ev(5, "Study block", "study"),
+        ev(6, "Band", "band"), ev(6, "Study block", "study"),
+        ev(7, "Study block", "study"),
+        ev(8, "Study block", "study"), ev(8, "Spark 8:00", "spark"),
+        ev(9, "Final review", "due"),
+        ev(10, "FINAL EXAM", "exam"),
+        ev(11, "Bio 101", "class"),
+        ev(12, "Band", "band"),
+        ev(13, "Post reel", "media"),
+      ],
+    },
+  ],
+};
 
 export type PatternProps = {
   content: ResponseContent;
@@ -276,14 +417,6 @@ export type PatternProps = {
   active: boolean;
   /** Fires once the answer has fully revealed — drives the shared "back to landing" corner button in page.tsx. */
   onComplete?: () => void;
-  /**
-   * How tall the floating compose box is as actually drawn — its live height times whatever
-   * scale it's being rendered at. Live rather than a constant: the box grows with its own
-   * text, and the measured-columns pattern places it *inside* column one, so that column's
-   * usable height moves with it. A pattern that floats content over the bar rather than
-   * laying out around it (ScrollPattern) can ignore this.
-   */
-  composeHeightCqw?: number;
 };
 
 /**
@@ -378,18 +511,18 @@ export const STAY_IN_MESSAGES: ChatBubble[] = [
  * thread. It replaces the usual idle "Ask Gemini" pill: tapping it is what brings
  * Gemini's own compose bar up from the bottom of the screen.
  */
-export type MessagesSuggestion = { title: string; subtitle: string };
+export type MessagesSuggestion = { title: string };
 
 /** Picks up on Marco's "let's do our usual order". */
-export const STAY_IN_SUGGESTION: MessagesSuggestion = { title: "Reorder your usual", subtitle: "The group chat · Messages" };
+export const STAY_IN_SUGGESTION: MessagesSuggestion = { title: "Reorder your usual" };
 
-/** Picks up on Priya's "let's go to sushi tonight" plus Marco's dietary ask. */
-export const GO_OUT_SUGGESTION: MessagesSuggestion = { title: "Sushi restaurants nearby", subtitle: "The group chat · Messages" };
+/** Picks up on Marco's dietary ask. */
+export const GO_OUT_SUGGESTION: MessagesSuggestion = { title: "Find restaurants" };
 
 export const GO_OUT_MESSAGES: ChatBubble[] = [
-  { kind: "outgoing", text: "Friday night, what are we doing?" },
-  { kind: "incoming", name: "Priya", avatar: "/gemini/friday-night/avatar-priya.png", text: "let’s go to sushi tonight" },
-  { kind: "incoming", name: "Marco", avatar: "/gemini/friday-night/avatar-marco.png", text: "only if there are vegetarian and gluten free options" },
+  { kind: "outgoing", text: "Want to go out tonight?" },
+  { kind: "incoming", name: "Priya", avatar: "/gemini/friday-night/avatar-priya.png", text: "I’m in!" },
+  { kind: "incoming", name: "Marco", avatar: "/gemini/friday-night/avatar-marco.png", text: "Would love to go somewhere with vegetarian options" },
 ];
 
 export type SushiResult = {
@@ -433,7 +566,10 @@ export type SushiSearchContent = {
 };
 
 export const GO_OUT_SEARCH: SushiSearchContent = {
-  promptLines: ["Find the best sushi restaurants near me"],
+  // What the thread actually asked for, rather than naming a cuisine nobody mentioned.
+  // Narrowing to sushi is Gemini's recommendation, so it belongs in the answer below, not
+  // in the prompt: `introText` is where the three spots are proposed.
+  promptLines: ["Find me restaurants with vegetarian options nearby"],
   introText: "Three sushi spots near you fit the thread, all open tonight. Vegetarian rolls and gluten free soy at every one.",
   results: [
     {
@@ -507,21 +643,26 @@ export const GO_OUT_SEARCH: SushiSearchContent = {
 
 export type Persona = {
   id: string;
+  /** Who they are, as the landing pill's first line — a role, not an age ("Student", not "The student, 20"). */
   label: string;
+  /** The second line under it, describing the life the story is a day in. */
   sublabel: string;
+  /**
+   * A scene from this persona's life rather than a portrait of them — the landing pill shows
+   * the desk, the trail, the loaded car, not a face. Drawn as a circle there, so what matters
+   * is the middle of the frame: all three of these crop well dead-centre, which is why there
+   * is no focal-point knob here any more. A photo whose subject sits off-centre would need
+   * one back (`object-position`), so check a replacement before dropping it in.
+   */
   image: string;
-  /** Horizontal focal point (0-100, `object-position` X) that keeps this persona's face centered under `object-fit: cover` — each source photo needs its own crop. */
-  imageFocusXPct: number;
-  /** Solid color standing in for a persona photo inside the landing screen's pills, until real photography is signed off — paired with the label's initial. */
-  swatchColor: string;
   /** Whether this card routes anywhere yet — disabled/greyed out on the landing screen until it does. */
   active?: boolean;
 };
 
 export const PERSONAS: Persona[] = [
-  { id: "student", label: "The student, 20", sublabel: "Student and guitar player", image: "/gemini/personas/student.png", imageFocusXPct: 40, swatchColor: "#4c8df6", active: true },
-  { id: "traveler", label: "The traveler, 28", sublabel: "Professional who loves to travel", image: "/gemini/personas/traveler.png", imageFocusXPct: 37, swatchColor: "#e8734a", active: true },
-  { id: "parent", label: "The parent, 38", sublabel: "Parent with school and work obligations", image: "/gemini/personas/parent.png", imageFocusXPct: 44, swatchColor: "#34a853", active: true },
+  { id: "student", label: "Student", sublabel: "College student and guitar player", image: "/v81-image-assets-inuse/assets/pick/student-opt-8b.jpg", active: true },
+  { id: "traveler", label: "Traveler", sublabel: "Professional who loves to travel", image: "/v81-image-assets-inuse/assets/pick/sunrise-meadow.jpg", active: true },
+  { id: "parent", label: "Working Parent", sublabel: "Parent with school and work obligations", image: "/v81-image-assets-inuse/assets/pick/parent-suv3.jpg", active: true },
 ];
 
 export type RundownPill = {
@@ -554,6 +695,10 @@ export type RundownData = {
    *
    * Replaced an earlier width%/left% pair that could only pan horizontally — and that, at
    * the values it was carrying, worked out to exactly a plain centred cover anyway.
+   *
+   * Dormant at the moment: all three backdrops happen to frame correctly as a plain centred
+   * cover, so none of them spends any of this budget. Kept because the next photo swap is
+   * where it gets spent, and the arithmetic above is the part that is easy to get wrong.
    */
   bgZoom?: number;
   bgOffsetXCqw?: number;
@@ -564,29 +709,26 @@ export type RundownData = {
 /** Keyed by Persona.id — only personas with a built rundown screen appear here. */
 export const RUNDOWNS: Record<string, RundownData> = {
   student: {
-    bgImage: "/gemini/personas/student.png",
-    // She sits high and central, so the heading lands straight across her eyes. Nudged down
-    // and right to get the type off them. It can only be a nudge: her face is ~22cqw tall
-    // and the gap between the heading and a five-pill stack is only ~14cqw, so pushing her
-    // far enough down to fully clear the type just buries her chin in the top pill instead.
-    bgZoom: 1.14,
-    bgOffsetXCqw: 5,
-    bgOffsetYCqw: 3.4,
+    // The real study-desk scene. It is a 9:16 source in a 16:9 frame, so a plain centred
+    // cover keeps only the middle third of it — which happens to be the best third: the
+    // tablet lands dead centre with the phone, book and notebook around it. Every framing
+    // that zooms or pans off that made it worse (the tablet grows and swallows the frame),
+    // so this one is deliberately left alone. What the crop costs is contrast under the
+    // pills, where the tablet's white screen sits — the scrim in RundownScreen pays for it.
+    bgImage: "/v81-image-assets-inuse/assets/pick/student-opt-8b.jpg",
     pills: [
-      { id: "study-semester", label: "Plan my study semester" },
-      { id: "friday-night", label: "Sort Friday night", active: true },
-      { id: "band-tour", label: "Plan the band tour", active: true },
-      { id: "poster", label: "Make the poster" },
-      { id: "study-notebook", label: "Make a study notebook" },
+      { id: "study-semester", label: "Organize my semester", active: true },
+      { id: "friday-night", label: "Make plans for Friday night", active: true },
+      { id: "band-tour", label: "Rock the band tour", active: true },
+      { id: "study-notebook", label: "Build a study notebook" },
     ],
   },
   traveler: {
-    bgImage: "/gemini/personas/traveler.png",
-    // she sits low and central, so the pill stack lands across her mouth; lifted and pushed
-    // right so her eyes and mouth clear it
-    bgZoom: 1.25,
-    bgOffsetXCqw: 8,
-    bgOffsetYCqw: -6,
+    // Same photo the landing pill crops its thumbnail from, which is the rule now: the pill
+    // is a window onto the screen it opens. Wider than the frame (2.36:1 into 16:9) and
+    // composed with the meadow low and the ridge high, so a plain centred cover already puts
+    // the dark meadow under the pill stack — nothing to pan for.
+    bgImage: "/v81-image-assets-inuse/assets/pick/sunrise-meadow.jpg",
     pills: [
       { id: "friends-weekend", label: "Sort the friend’s weekend", active: true },
       { id: "partnerships-vp", label: "Brief me on the partnerships VP" },
@@ -595,7 +737,9 @@ export const RUNDOWNS: Record<string, RundownData> = {
     ],
   },
   parent: {
-    bgImage: "/gemini/personas/parent.png",
+    // 9:16 into 16:9, so a centred cover keeps the middle third — which frames the open boot
+    // and the kit in it, with the empty dark interior landing right where the pills go.
+    bgImage: "/v81-image-assets-inuse/assets/pick/parent-suv3.jpg",
     pills: [
       { id: "party", label: "Plan the party end to end" },
       { id: "play-date", label: "Answer the play date" },

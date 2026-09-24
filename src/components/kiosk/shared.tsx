@@ -13,9 +13,10 @@ export const REVEAL_STEP_MS = 110;
 export const REVEAL_DURATION_MS = 700;
 
 /**
- * A spinning "comet" trail circling a button that wants attention — a send
- * button once its prompt has finished typing, "Back to home" when it appears,
- * the Gemini Intelligence suggestion chip.
+ * A spinning "comet" trail circling a button that wants attention — "Back to
+ * home" when it appears, a "pick this" result card, the Gemini Intelligence
+ * suggestion chip. (The send button used to be the fourth; it emits concentric
+ * rings instead now — see PulseRings below.)
  *
  * It *wraps* the button rather than rendering inside it, which is what makes
  * it size-agnostic: the wrapper shrink-wraps whatever it's handed and the
@@ -31,16 +32,43 @@ export const REVEAL_DURATION_MS = 700;
  * than the button so the ring scales in lockstep with it instead of the two
  * drifting apart mid-breath. The suggestion chip opts out (ring only) — a
  * standing notification that also throbs reads as nagging.
+ *
+ * `trail` picks what sweeps. The default is Gemini's blue, which is what the
+ * ring means on Gemini's own chrome. "spectrum" is for the one place the ring
+ * appears *outside* it — the Gemini Intelligence chip in the Messages app,
+ * where the design hands it the full iridescent sweep instead: a white head
+ * with the spectrum trailing behind it, which is how that chip announces
+ * Gemini inside someone else's app rather than on Gemini's own surface.
  */
+const COMET_TRAILS = {
+  blue: "transparent 0%, #4c8df6 18%, transparent 45%",
+  // hue order read off the design: the head is white, and the tail runs back through
+  // violet, magenta, red, orange, amber, green and teal before it fades out
+  spectrum: [
+    "transparent 0%",
+    "rgba(56,189,248,0.45) 5%",
+    "rgba(74,222,128,0.65) 11%",
+    "rgba(255,209,102,0.8) 17%",
+    "rgba(255,138,80,0.92) 23%",
+    "rgba(255,107,157,1) 29%",
+    "rgba(199,125,255,1) 35%",
+    "#ffffff 41%",
+    "transparent 49%",
+  ].join(", "),
+} as const;
+
 export function CometRing({
   active,
   pulse = false,
   radius = "9999px",
   glow = false,
+  trail = "blue",
   children,
 }: {
   active: boolean;
   pulse?: boolean;
+  /** Which sweep the trail paints — see COMET_TRAILS above. */
+  trail?: keyof typeof COMET_TRAILS;
   /** Border radius for the ring and its wrapper. Defaults to a full pill; pass a smaller
    * value to hug a rounded square (e.g. a result card's photo). */
   radius?: string;
@@ -61,13 +89,73 @@ export function CometRing({
           style={{
             inset: "-0.3cqw",
             borderRadius: radius,
-            background: "conic-gradient(from var(--comet-angle), transparent 0%, #4c8df6 18%, transparent 45%)",
+            background: `conic-gradient(from var(--comet-angle), ${COMET_TRAILS[trail]})`,
           }}
         />
       )}
       {/* positioned (and later in DOM order) so it paints over the ring — a positioned
           element outranks a static sibling no matter which comes first, so leaving this
           static would let the ring cover the button it's meant to circle */}
+      <span className="relative inline-flex" style={{ borderRadius: radius }}>
+        {children}
+      </span>
+    </span>
+  );
+}
+
+const PULSE_RING_DURATION_MS = 2200;
+
+/**
+ * Concentric rings pulsing out of a button that wants attention — what the send button
+ * uses once its prompt has finished typing, in place of the comet trail above.
+ *
+ * Wraps its button the same way CometRing does, and for the same reason: the wrapper
+ * shrink-wraps whatever it's handed and each ring is drawn on that border box, so it
+ * needs no per-button tuning. Where the two differ is what they say. A comet trail is one
+ * mark travelling *around* a target — it circles, which points at the button but doesn't
+ * move away from it. These rings leave: each one starts flush with the button's edge and
+ * travels outward, so the motion has a source, and the source is the thing to tap.
+ *
+ * `count` rings share one animation, evenly offset across its duration — that offset is
+ * the whole effect. Two rings half a cycle apart is what puts a bright ring at the button
+ * while a faint one is still on its way out, which is what makes it read as concentric
+ * rather than as one ring blinking.
+ *
+ * Deliberately no breathing scale on the button itself (CometRing's `pulse`): the rings
+ * already carry the motion, and a button that also throbs underneath them reads as two
+ * animations competing rather than one cue.
+ */
+export function PulseRings({
+  active,
+  radius = "9999px",
+  count = 2,
+  children,
+}: {
+  active: boolean;
+  /** Border radius for the rings and their wrapper. Defaults to a full pill. */
+  radius?: string;
+  /** How many rings are in flight at once, evenly spread across one cycle. */
+  count?: number;
+  children: ReactNode;
+}) {
+  return (
+    <span className="relative inline-flex" style={{ borderRadius: radius }}>
+      {active &&
+        Array.from({ length: count }, (_, i) => (
+          <span
+            key={i}
+            aria-hidden
+            className="pointer-events-none absolute inset-0 border-[0.1cqw] border-white"
+            style={{
+              borderRadius: radius,
+              animation: `pulse-ring ${PULSE_RING_DURATION_MS}ms ease-out infinite`,
+              animationDelay: `${(i * PULSE_RING_DURATION_MS) / count}ms`,
+            }}
+          />
+        ))}
+      {/* positioned (and later in DOM order) so it paints over the rings — a positioned
+          element outranks a static sibling no matter which comes first, so leaving this
+          static would let a ring cross the button it's meant to be leaving */}
       <span className="relative inline-flex" style={{ borderRadius: radius }}>
         {children}
       </span>
@@ -173,20 +261,58 @@ export function ScrollCue({
 }
 
 /**
- * "For position only" — marks a screen whose full-bleed backdrop is a stand-in whose rights
- * aren't settled, so a screenshot of it can't circulate as if the photo were signed off.
- * Every screen carrying one of those backdrops gets one; retire the chip (not the photo)
- * once that image is cleared.
+ * The way out, in the frame's top-left corner — on every screen past the landing one.
  *
- * `pointer-events-none` is deliberate: it's a margin note, not a control, and nothing inside
- * the kiosk frame is allowed to look tappable without being tappable. Positioned against the
- * frame's own chrome inset so it lands in the same spot on every screen, and it carries its
- * own scrim + blur because it has to stay legible over whatever the photo happens to be
- * doing behind it.
+ * A kiosk has no browser chrome and no gestures a passer-by knows about, so if a screen does
+ * not draw an exit it does not have one. That used to be covered by a Home button in a bar
+ * *outside* the frame; with that bar gone this is the only way back, which is why it is not
+ * optional per screen and why it sits above everything (`z-30`) rather than wherever its
+ * screen happens to stack it — including over the compose bar, which is `z-20`.
+ *
+ * Where it goes is the screen's own business: one step back from a sub-choice, all the way
+ * home from inside a demo.
  */
-export function FpoChip() {
+export function BackButton({ onClick }: { onClick: () => void }) {
   return (
-    <span className="pointer-events-none absolute right-[2.87cqw] top-[2.87cqw] z-10 rounded-full border border-white/25 bg-black/40 px-[0.95cqw] py-[0.38cqw] text-[0.85cqw] font-medium tracking-[0.1em] text-white/85 backdrop-blur-md">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Back"
+      className="absolute left-[2.6cqw] top-[5.94cqw] z-30 flex h-[3.23cqw] w-[3.23cqw] items-center justify-center"
+    >
+      <img src="/gemini/rundown/back-button.png" alt="" className="absolute inset-0 h-full w-full object-cover" />
+      <span className="relative text-[1.55cqw] text-white/96">&lsaquo;</span>
+    </button>
+  );
+}
+
+/**
+ * "For position only" — marks a photo that is a stand-in whose rights aren't settled, so a
+ * screenshot of it can't circulate as if the image were signed off. Every stand-in photo
+ * gets one; retire the chip (not the photo) once that image is cleared.
+ *
+ * Two sizes, because there are two kinds of stand-in on screen. The default marks a screen's
+ * full-bleed backdrop and is positioned against the frame's own chrome inset, so it lands in
+ * the same spot on every screen. `inline` marks a single photo *inside* a component — the
+ * persona thumbnails in the landing pills — so it's sized to that photo and pinned to the
+ * bottom of whichever positioned box wraps it, rather than to the frame.
+ *
+ * `pointer-events-none` is deliberate in both: it's a margin note, not a control, and nothing
+ * inside the kiosk frame is allowed to look tappable without being tappable. Either size
+ * carries its own scrim + blur because it has to stay legible over whatever the photo happens
+ * to be doing behind it.
+ */
+export function FpoChip({ inline = false }: { inline?: boolean } = {}) {
+  const base =
+    "pointer-events-none absolute z-10 rounded-full border border-white/25 bg-black/40 font-medium tracking-[0.1em] text-white/85 backdrop-blur-md";
+  return (
+    <span
+      className={
+        inline
+          ? `${base} bottom-[0.5cqw] left-1/2 -translate-x-1/2 px-[0.5cqw] py-[0.1cqw] text-[0.6cqw]`
+          : `${base} right-[2.87cqw] top-[2.87cqw] px-[0.95cqw] py-[0.38cqw] text-[0.85cqw]`
+      }
+    >
       FPO
     </span>
   );

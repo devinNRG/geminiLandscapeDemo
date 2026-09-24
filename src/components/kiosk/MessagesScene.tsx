@@ -22,6 +22,23 @@ const CREW_AVATARS = [
  */
 export const PHONE_COLUMN = "46cqw";
 
+/**
+ * The Messages app is drawn on its own surface rather than floating on the kiosk's black:
+ * a lighter header strip with rounded top corners, and a darker body sheet under it holding
+ * the thread, the suggestion chip and the RCS bar. Both are wider than the content column
+ * they wrap, and the body is wider than the header by a hair — that is measured off the
+ * design, not a rounding slip, so don't "fix" the two to match.
+ */
+const HEADER_PANEL = "49.2cqw";
+const BODY_PANEL = "49.7cqw";
+const PANEL_RADIUS = "2.7cqw";
+/** Gap from the RCS bar's bottom edge down to the body sheet's. Chosen so the bar still
+ * rests exactly where the kiosk's own Gemini compose bar does (2.98cqw off the frame's
+ * bottom), which is what lets Gemini's pill slide up and sit on top of it. */
+const RCS_INSET_CQW = 1.68;
+/** How far the sheet stops short of the frame's bottom edge — the rest of the sum above. */
+const SHEET_BOTTOM_CQW = 1.3;
+
 // The thread plays out one message at a time rather than landing all at once. Only the
 // user's own outgoing message gets a live typewriter — you never watch someone else's
 // text appear letter by letter in a real chat, you watch their typing indicator and then
@@ -56,6 +73,7 @@ function Icon({ paths, className }: { paths: string[]; className: string }) {
   );
 }
 
+const ARROW_BACK = ["M20 12H4", "M10 18l-6-6 6-6"];
 const ADD_CIRCLE = ["M12 2a10 10 0 100 20 10 10 0 000-20z", "M12 8v8", "M8 12h8"];
 const IMAGE = ["M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z", "M8.5 10a1.5 1.5 0 100-3 1.5 1.5 0 000 3z", "M21 15l-5-5L5 21"];
 
@@ -69,9 +87,21 @@ const IMAGE = ["M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-
  * demo's standing rule is that nothing inside the frame looks tappable unless it is.
  * The avatar cluster stays because it reads as identity rather than as an affordance.
  */
-export function MessagesTopBar() {
+/**
+ * The thread's own header strip. It used to be handed to page.tsx and drawn as the kiosk
+ * frame's top bar, which put it outside the app it belongs to; here it is the top of the
+ * Messages surface, on its own lighter panel, which is what the design shows.
+ *
+ * Its back arrow is scenery — part of the picture of a messaging app, like the RCS bar
+ * below. The working way out of the demo is the kiosk's own button in the frame's corner.
+ */
+function MessagesHeader() {
   return (
-    <div className="flex h-[5cqw] shrink-0 items-center justify-center gap-[0.94cqw]">
+    <div
+      className="flex h-[5cqw] shrink-0 items-center gap-[0.94cqw] bg-[#201f23] pl-[2cqw]"
+      style={{ width: HEADER_PANEL, borderRadius: `${PANEL_RADIUS} ${PANEL_RADIUS} 0 0` }}
+    >
+      <Icon paths={ARROW_BACK} className="h-[1.87cqw] w-[1.87cqw] shrink-0 text-[#e4e1e7]" />
       <div className="grid shrink-0 grid-cols-2 gap-[0.1cqw]" style={{ width: "3.13cqw", height: "3.13cqw" }}>
         {CREW_AVATARS.map((src) => (
           <img key={src} src={src} alt="" className="h-full w-full rounded-full object-cover" />
@@ -198,10 +228,10 @@ function AnimatedThread({
  * marks this as the one tappable item in the thread; unlike the Send button it never
  * pulses — a standing notification that also throbs reads as nagging.
  */
-function MessagesSuggestionChip({ title, subtitle, onClick }: { title: string; subtitle: string; onClick: () => void }) {
+function MessagesSuggestionChip({ title, onClick }: { title: string; onClick: () => void }) {
   return (
-    <span className="flex max-w-[75%] self-end">
-      <CometRing active>
+    <span className="inline-flex">
+      <CometRing active trail="spectrum">
         <button
           type="button"
           onClick={onClick}
@@ -212,10 +242,9 @@ function MessagesSuggestionChip({ title, subtitle, onClick }: { title: string; s
               dark fill rather than standing in as the pill's own background */}
           <img src="/gemini/friday-night/suggestion-pill-4c-bg.png" alt="" className="absolute inset-0 h-full w-full object-cover" />
           <img src="/gemini/friday-night/suggestion-pill-sparkle.svg" alt="" className="relative h-[2cqw] w-[2cqw] shrink-0" />
-          <span className="relative flex flex-col">
-            <span className="whitespace-nowrap text-[1.05cqw] font-medium text-white">{title}</span>
-            <span className="whitespace-nowrap text-[0.8cqw] text-[#c9d3ee]">{subtitle}</span>
-          </span>
+          {/* one line, at the thread's own body size — it is an offer phrased like a message,
+              not a notification with a source line under it */}
+          <span className="relative whitespace-nowrap text-[1.25cqw] font-medium text-white">{title}</span>
         </button>
       </CometRing>
     </span>
@@ -236,8 +265,8 @@ function MessagesSuggestionChip({ title, subtitle, onClick }: { title: string; s
 function MessagesComposeBar({ show }: { show: boolean }) {
   return (
     <div
-      className="absolute bottom-[2.98cqw] left-1/2 flex -translate-x-1/2 items-center gap-[0.62cqw] transition-opacity duration-500"
-      style={{ width: PHONE_COLUMN, opacity: show ? 1 : 0 }}
+      className="absolute left-1/2 flex -translate-x-1/2 items-center gap-[0.62cqw] transition-opacity duration-500"
+      style={{ width: PHONE_COLUMN, bottom: `${RCS_INSET_CQW}cqw`, opacity: show ? 1 : 0 }}
     >
       <div className="flex h-[4.38cqw] flex-1 items-center gap-[1.25cqw] rounded-[2.8cqw] bg-[#201f23] px-[1.25cqw]">
         <Icon paths={ADD_CIRCLE} className="h-[1.87cqw] w-[1.87cqw] shrink-0 text-[#c7c5d1]" />
@@ -277,31 +306,52 @@ export default function MessagesScene({
 }: {
   active: boolean;
   messages: ChatBubble[];
-  suggestion?: { show: boolean; onClick: () => void; title: string; subtitle: string };
+  suggestion?: { show: boolean; onClick: () => void; title: string };
   showComposeBar?: boolean;
 }) {
   return (
-    <div className="relative flex h-full flex-col items-center pt-[1.5cqw]">
-      <div className="flex flex-col gap-[1cqw]" style={{ width: PHONE_COLUMN }}>
-        {/* remounting on `active` is what rewinds the thread for the next run-through */}
-        <AnimatedThread
-          key={active ? "playing" : "idle"}
-          messages={messages}
-          active={active}
-          trailing={
-            suggestion && suggestion.show ? (
-              // The whole scene is rendered pointer-events:none by page.tsx so the chat can
-              // sit behind Gemini's overlay without swallowing taps meant for it. The chip is
-              // the one thing in here that *is* a control, so it has to opt back in by hand.
-              <div className="pointer-events-auto flex flex-col [animation:fade-in-up_400ms_ease-out]">
-                <MessagesSuggestionChip title={suggestion.title} subtitle={suggestion.subtitle} onClick={suggestion.onClick} />
-              </div>
-            ) : null
-          }
-        />
-      </div>
+    <div
+      className="flex h-full flex-col items-center pt-[1cqw]"
+      style={{ paddingBottom: `${SHEET_BOTTOM_CQW}cqw` }}
+    >
+      <MessagesHeader />
 
-      <MessagesComposeBar show={showComposeBar} />
+      {/* the sheet is the positioning context for everything anchored to the app's bottom
+          edge — the RCS bar and the suggestion chip above it */}
+      <div
+        className="relative flex min-h-0 flex-1 flex-col items-center overflow-hidden bg-[#141317] pt-[1.5cqw]"
+        style={{ width: BODY_PANEL, borderRadius: PANEL_RADIUS }}
+      >
+        <div className="flex flex-col gap-[1cqw]" style={{ width: PHONE_COLUMN }}>
+          {/* remounting on `active` is what rewinds the thread for the next run-through */}
+          <AnimatedThread
+            key={active ? "playing" : "idle"}
+            messages={messages}
+            active={active}
+            trailing={
+              suggestion && suggestion.show ? (
+                // Still handed to AnimatedThread, because *when* it appears is the point: it
+                // is a reaction to the conversation and must not beat it on screen. But it no
+                // longer sits in the thread's flow — it is absolute, so it anchors to the
+                // sheet and parks just above the RCS bar, which is where the design puts it:
+                // an offer from the app's own chrome rather than one more message.
+                <div
+                  className="absolute left-1/2 flex -translate-x-1/2 justify-end"
+                  style={{ width: PHONE_COLUMN, bottom: `${RCS_INSET_CQW + 4.38 + 1.24}cqw` }}
+                >
+                  {/* the entrance animation stays on this inner wrapper — on the box above it
+                      would drive `transform` against the centring translate */}
+                  <div className="pointer-events-auto [animation:fade-in-up_400ms_ease-out]">
+                    <MessagesSuggestionChip title={suggestion.title} onClick={suggestion.onClick} />
+                  </div>
+                </div>
+              ) : null
+            }
+          />
+        </div>
+
+        <MessagesComposeBar show={showComposeBar} />
+      </div>
     </div>
   );
 }

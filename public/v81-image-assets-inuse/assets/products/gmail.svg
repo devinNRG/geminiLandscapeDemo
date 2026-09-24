@@ -1,0 +1,31 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="gmail_logo_192px">
+<g id="art_layer">
+<g id="bounding box">
+</g>
+<path id="Rectangle 1739335229" d="M42.5834 12.8333H53.6667V44.9167C53.6667 46.8497 52.0997 48.4167 50.1667 48.4167H44.3334C43.3669 48.4167 42.5834 47.6332 42.5834 46.6667V12.8333Z" fill="url(#paint0_linear_0_4)"/>
+<path id="Rectangle 1739335227" d="M13.4167 12.8333H2.33342V44.9167C2.33342 46.8497 3.90042 48.4167 5.83341 48.4167H11.6667C12.6332 48.4167 13.4167 47.6332 13.4167 46.6667V12.8333Z" fill="#FC413D"/>
+<path id="Union" d="M11.4409 8.88305C9.09806 6.91374 5.60244 7.21648 3.63309 9.55924C1.66377 11.9021 1.96648 15.3977 4.30928 17.367L26.4987 36.0192C27.3667 36.7488 28.6335 36.7488 29.5015 36.0192L51.6909 17.367C54.0336 15.3977 54.3363 11.902 52.3671 9.55924C50.3977 7.21646 46.9021 6.91377 44.5593 8.88305L28.0001 22.8022L11.4409 8.88305Z" fill="url(#paint1_linear_0_4)"/>
+</g>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_4" x1="48.1251" y1="12.8333" x2="48.1251" y2="48.4167" gradientUnits="userSpaceOnUse">
+<stop stop-color="#60D673"/>
+<stop offset="0.168639" stop-color="#42C868"/>
+<stop offset="0.387752" stop-color="#0EBC5F"/>
+<stop offset="0.623366" stop-color="#00A9BB"/>
+<stop offset="0.859305" stop-color="#3C90FF"/>
+<stop offset="1" stop-color="#3186FF"/>
+</linearGradient>
+<linearGradient id="paint1_linear_0_4" x1="2.33335" y1="13.4558" x2="53.6667" y2="13.4558" gradientUnits="userSpaceOnUse">
+<stop offset="0.08" stop-color="#FF63A0"/>
+<stop offset="0.3" stop-color="#FC413D"/>
+<stop offset="0.5" stop-color="#FC413D"/>
+<stop offset="0.646653" stop-color="#FC413D"/>
+<stop offset="0.72465" stop-color="#FC5C30"/>
+<stop offset="0.864641" stop-color="#FEB10C"/>
+<stop offset="0.912035" stop-color="#FEC700"/>
+<stop offset="0.96494" stop-color="#FFDB0F"/>
+</linearGradient>
+</defs>
+</svg>

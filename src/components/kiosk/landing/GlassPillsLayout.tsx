@@ -12,45 +12,50 @@ import { FpoChip } from "../shared";
  * frosted glass rather than a solid fill — that only reads as glass with
  * something behind it to refract, which is what this photo is for.
  *
- * Each persona is still a color swatch + initial rather than a photo — the
- * per-persona photography isn't signed off yet, and a flat color reads as an
- * intentional placeholder rather than a broken image.
+ * The screen names what it is asking for ("Choose a story") rather than
+ * narrating the visitor ("Who's starting their day?"), and the pills answer
+ * in the same register: a role plus the life that story is a day in, not an
+ * age. The subtitle under the heading is what carries the framing the old
+ * single question used to.
  */
 export default function GlassPillsLayout({ onSelect }: { onSelect: (persona: Persona) => void }) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-black">
-      {/* `object-top` + a top-origin scale rather than a plain centered cover: the source
-          is 4:3 going into a 16:9 frame, so something has to be cropped, and cropping from
-          the bottom keeps the subject's face clear of the heading. (Centered, the crop
-          pulled his eyes up to ~13% of the frame — directly behind the heading.) The zoom
-          then pushes them further down and fills the frame with more of him and less
-          background. Any future swap of this photo needs both values re-checked against
-          wherever its own subject lands. */}
+      {/* A plain centered cover, with none of the zoom/pan the previous backdrop needed: this
+          photo is wider than the frame (2.36:1 into 16:9) and its subject is the whole
+          horizon rather than a face, so nothing has to be steered out from behind the heading
+          or the pill stack. Swapping in a photo with a subject (a person, a focal object)
+          puts those framing questions back — see RundownScreen's `bgZoom`/`bgOffset*` for the
+          pan budget that answers them. */}
       <img
-        src="/geminiBackground1.jpg"
+        src="/v81-image-assets-inuse/assets/pick/sunrise-dunes.jpg"
         alt=""
-        className="pointer-events-none absolute inset-0 h-full w-full origin-top scale-[1.15] object-cover object-top"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
       />
-      {/* Legibility scrim, shaped rather than a flat wash: darker at the very top (the
-          heading sits over bright brickwork here — a flat 30% left nearly half that band
-          under a 4.5:1 contrast ratio) and at the bottom (behind the pills), but lightest
-          across the middle so his face reads as a photo instead of a murky backdrop. The
-          bottom stops well short of near-black on purpose — burying the photo there would
-          put the pills back on a flat dark field, the exact thing the glass needs a
-          visible backdrop to avoid. */}
+      {/* Legibility scrim, shaped rather than a flat wash: darker at the very top (behind the
+          heading) and at the bottom (behind the pills), but lightest across the middle so the
+          photo reads as a photo instead of a murky backdrop. The bottom stops well short of
+          near-black on purpose — burying the photo there would put the pills back on a flat
+          dark field, the exact thing the glass needs a visible backdrop to avoid.
+          The top is heavy (0.78) because this crop puts bright sunrise sky exactly where the
+          heading sits — the portrait version's taller crop gets dark upper sky for free, and
+          this is what buys the same ~60-luminance band to set type on. */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.34) 20%, rgba(0,0,0,0.22) 45%, rgba(0,0,0,0.55) 100%)",
+            "linear-gradient(to bottom, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.6) 22%, rgba(0,0,0,0.28) 50%, rgba(0,0,0,0.6) 100%)",
         }}
       />
 
       <FpoChip />
 
-      <p className="relative z-10 pointer-events-none pt-[5.63cqw] text-center text-[2.9cqw] text-white">
-        Who&rsquo;s starting their day?
-      </p>
+      <div className="relative z-10 pointer-events-none flex flex-col items-center gap-[0.7cqw] pt-[5.2cqw] text-center">
+        {/* a display step above the 2.9cqw every other screen's heading sits at — this is the
+            one screen with nothing above it in the flow, so it opens rather than continues */}
+        <p className="text-[4cqw] leading-[4.4cqw] text-white">Choose a story</p>
+        <p className="text-[1.55cqw] leading-[1.9cqw] text-white/85">A day in the life with Gemini</p>
+      </div>
 
       <div className="relative z-10 mt-auto flex w-full flex-col items-center pb-[3.5cqw]">
         <div className="flex w-[48cqw] flex-col gap-[1cqw]">
@@ -60,20 +65,32 @@ export default function GlassPillsLayout({ onSelect }: { onSelect: (persona: Per
               type="button"
               disabled={!persona.active}
               onClick={() => onSelect(persona)}
-              className={`flex h-[5.7cqw] items-center gap-[1.3cqw] rounded-full border py-[0.7cqw] pl-[0.7cqw] pr-[2.2cqw] text-left backdrop-blur-xl transition-transform duration-150 ${
+              /* Glass over a dark tint rather than over a white one: a white veil on a photo
+                 this dark washes to a flat grey and the refraction stops reading, where a
+                 black tint keeps the photo visible through it and lets the hairline border do
+                 the work of describing the pill's edge. */
+              className={`flex h-[6.6cqw] items-center gap-[1.35cqw] rounded-full border p-[0.75cqw] pr-[2.4cqw] text-left backdrop-blur-2xl transition-transform duration-150 ${
                 persona.active
-                  ? "border-white/15 bg-white/10 active:scale-[0.97]"
-                  : "pointer-events-none border-white/8 bg-white/4"
+                  ? "border-white/12 bg-black/45 active:scale-[0.97]"
+                  : "pointer-events-none border-white/8 bg-black/25"
               }`}
             >
+              {/* the persona photography is a stand-in like every other photo here, so each
+                  thumbnail carries its own chip — the screen-level one above only speaks for
+                  the backdrop behind it */}
               <span
-                className={`flex h-full w-[4.3cqw] shrink-0 items-center justify-center rounded-full text-[1.7cqw] font-medium text-white ${!persona.active ? "opacity-40 grayscale" : ""}`}
-                style={{ backgroundColor: persona.swatchColor }}
+                className={`relative aspect-square h-full shrink-0 overflow-hidden rounded-full ${!persona.active ? "opacity-40 grayscale" : ""}`}
               >
-                {persona.id.charAt(0).toUpperCase()}
+                <img src={persona.image} alt="" className="h-full w-full object-cover" />
+                <FpoChip inline />
               </span>
-              <span className={`whitespace-nowrap text-[1.5cqw] font-medium ${persona.active ? "text-white" : "text-white/40"}`}>
-                {persona.label}
+              <span className="flex min-w-0 flex-col gap-[0.1cqw]">
+                <span className={`whitespace-nowrap text-[1.6cqw] leading-[2cqw] font-medium ${persona.active ? "text-white" : "text-white/40"}`}>
+                  {persona.label}
+                </span>
+                <span className={`whitespace-nowrap text-[1.25cqw] leading-[1.55cqw] ${persona.active ? "text-white/60" : "text-white/25"}`}>
+                  {persona.sublabel}
+                </span>
               </span>
             </button>
           ))}
