@@ -130,7 +130,11 @@ function ResultSection({ result, onChoose }: { result: RestaurantResult; onChoos
             </svg>
           </span>
           <span className="flex min-w-0 items-center gap-[0.35cqw] text-[#8d8d8d]">
-            <img src="/gemini/go-out/icon-vegetarian.png" alt="" className="h-[1.1cqw] w-[1.1cqw] shrink-0" />
+            {result.categoryIcon ? (
+              <span className="shrink-0 text-[1.05cqw] leading-none">{result.categoryIcon}</span>
+            ) : (
+              <img src="/gemini/go-out/icon-vegetarian.png" alt="" className="h-[1.1cqw] w-[1.1cqw] shrink-0" />
+            )}
             <span className="truncate">{result.category}</span>
           </span>
           <span>

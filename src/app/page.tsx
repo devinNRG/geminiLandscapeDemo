@@ -7,16 +7,29 @@ import {
   FRIDAY_NIGHT_TASK,
   GO_OUT_MESSAGES,
   GO_OUT_SEARCH,
+  DINNER_PLAN,
   DINNER_RESERVATION,
+  CITY_CHOICES,
   CITY_GUIDES,
   GO_OUT_SUGGESTION,
+  KID_RESTAURANTS,
   MEETING_BRIEF,
+  PARTY_PLAN,
+  PLAY_DATE_CALENDAR_CARD,
+  PLAY_DATE_CONFIRM,
+  PLAY_DATE_CONTACT,
+  PLAY_DATE_SCHEDULE_CARD,
+  PLAY_DATE_SUGGESTIONS,
+  PLAY_DATE_THREAD_ASK,
+  PLAY_DATE_THREAD_FREE,
+  PARTY_THEMES,
   PERSONAS,
   RUNDOWNS,
   SEMESTER_PLAN,
   STAY_IN_MESSAGES,
   STAY_IN_SUGGESTION,
   STUDY_NOTEBOOK,
+  VOICE_UPDATE,
   WEEKEND_RESPONSE,
   type ChatBubble,
   type MessagesSuggestion,
@@ -26,11 +39,15 @@ import {
 } from "@/components/kiosk/types";
 import TypingLines from "@/components/kiosk/TypingLines";
 import RundownScreen from "@/components/kiosk/RundownScreen";
-import CityChoiceScreen from "@/components/kiosk/CityChoiceScreen";
+import PersonaCompleteScreen from "@/components/kiosk/PersonaCompleteScreen";
+import RotatingChoiceScreen from "@/components/kiosk/RotatingChoiceScreen";
 import FridayNightChoiceScreen from "@/components/kiosk/FridayNightChoiceScreen";
 import TaskAutomationResponse from "@/components/kiosk/TaskAutomationResponse";
 import GoOutResponse, { GO_OUT_CUE_DELAY_MS } from "@/components/kiosk/GoOutResponse";
+import PlayDateOverlay from "@/components/kiosk/PlayDateOverlay";
+import VoiceCapture from "@/components/kiosk/VoiceCapture";
 import MessagesScene from "@/components/kiosk/MessagesScene";
+import DinnerPlanResponse from "@/components/kiosk/DinnerPlanResponse";
 import DinnerReservation from "@/components/kiosk/DinnerReservation";
 import MeetingBriefResponse from "@/components/kiosk/MeetingBriefResponse";
 import SemesterPlanResponse from "@/components/kiosk/SemesterPlanResponse";
@@ -38,10 +55,10 @@ import StudyNotebook from "@/components/kiosk/StudyNotebook";
 import ScrollPattern from "@/components/kiosk/patterns/ScrollPattern";
 import { BackButton, GradientPillButton, PulseRings, useThinkingPhase } from "@/components/kiosk/shared";
 
-type Stage = "landing" | "rundown" | "fridayNightChoice" | "cityChoice" | "idle" | "typed" | "response";
+type Stage = "landing" | "rundown" | "fridayNightChoice" | "cityChoice" | "partyChoice" | "complete" | "idle" | "typed" | "response";
 
 // which built demo the compose bar / response area are currently playing
-type DemoId = "weekend" | "fridayNight" | "goOut" | "bandTour" | "semester" | "notebook" | "meeting" | "dinner" | "city";
+type DemoId = "weekend" | "fridayNight" | "goOut" | "bandTour" | "semester" | "notebook" | "meeting" | "dinner" | "city" | "party" | "playDate" | "dinnerPlan" | "voice";
 
 // pill id -> the demo it plays; every other pill renders disabled on the rundown screen
 const PILL_DEMOS: Record<string, DemoId> = {
@@ -51,6 +68,9 @@ const PILL_DEMOS: Record<string, DemoId> = {
   "study-notebook": "notebook",
   "partnerships-vp": "meeting",
   "saturday-dinner": "dinner",
+  "play-date": "playDate",
+  "tonight-dinner": "dinnerPlan",
+  "voice-update": "voice",
   // "friday-night" is deliberately absent — it routes through the fridayNightChoice
   // screen instead, which sets activeDemo to "fridayNight" or "goOut" itself
 };
@@ -60,6 +80,7 @@ const PILL_DEMOS: Record<string, DemoId> = {
 const RESPONSE_CONTENT_BY_DEMO: Partial<Record<DemoId, ResponseContent>> = {
   weekend: WEEKEND_RESPONSE,
   bandTour: BAND_TOUR_RESPONSE,
+  party: PARTY_PLAN,
 };
 
 // which conversation the Friday-night messages scene opens on, per branch
@@ -90,16 +111,24 @@ const PROMPT_LINES_BY_DEMO: Record<DemoId, string[]> = {
   // the city flow's prompt names the city, so it comes from the picked guide instead —
   // see `promptLines` below. This entry is only the fallback before one is picked.
   city: [],
+  playDate: KID_RESTAURANTS.promptLines,
+  dinnerPlan: DINNER_PLAN.answer.promptLines,
+  // spoken, not typed — the Ask Gemini bar never comes up in this flow
+  voice: [],
+  party: PARTY_PLAN.promptLines,
 };
 
 // Demos whose answer takes the frame once it lands, so the compose bar parks for the rest of
 // the flow. (The semester demo parks from the moment its prompt is sent — see below.)
-const ANSWER_DEMOS: ReadonlySet<DemoId> = new Set<DemoId>(["goOut", "bandTour", "weekend", "dinner", "city"]);
+const ANSWER_DEMOS: ReadonlySet<DemoId> = new Set<DemoId>(["goOut", "bandTour", "weekend", "dinner", "city", "party", "playDate", "dinnerPlan"]);
 
 // A file attached to the prompt, shown as a chip at the top of the compose box.
-type ComposeAttachment = { name: string; icon: string };
+// A file attaches as a named chip; a photo attaches as the photo, cropped square, the way
+// an image sits in a compose box rather than being described in words.
+type ComposeAttachment = { image: string; name?: string };
 const ATTACHMENT_BY_DEMO: Partial<Record<DemoId, ComposeAttachment>> = {
-  weekend: { name: "NYC weekend preferences", icon: "/v81-image-assets-inuse/assets/products/sheets.png" },
+  weekend: { name: "NYC weekend preferences", image: "/v81-image-assets-inuse/assets/products/sheets.png" },
+  dinnerPlan: { image: "/v81-image-assets-inuse/assets/ph-fridge.jpg" },
 };
 
 // the expanded (multi-line) compose box's height must fit whatever text is currently visible,
@@ -159,7 +188,7 @@ const PICK_RING_COUNT = 3;
  * arrives (`pill-converge` in globals.css). Send's rings leave the button; these arrive at
  * the label, pulling the eye onto the instruction rather than away from it.
  */
-function PickPrompt({ active }: { active: boolean }) {
+function PickPrompt({ active, label }: { active: boolean; label: string }) {
   return (
     <div
       className="relative flex items-center whitespace-nowrap rounded-full bg-black px-[3cqw] text-[1.6cqw] text-white"
@@ -177,8 +206,19 @@ function PickPrompt({ active }: { active: boolean }) {
             }}
           />
         ))}
-      Tap on your chosen restaurant
+      {label}
     </div>
+  );
+}
+
+/** The dismiss dot on an attachment — inert, like everything else in the compose box. */
+function CloseDot() {
+  return (
+    <span className="flex h-[2cqw] w-[2cqw] shrink-0 items-center justify-center rounded-full bg-white text-[#1c1c1c]">
+      <svg viewBox="0 0 24 24" className="h-[1.2cqw] w-[1.2cqw]" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round">
+        <path d="M7 7l10 10M17 7L7 17" />
+      </svg>
+    </span>
   );
 }
 
@@ -224,6 +264,14 @@ export default function Home() {
   const [chatVisibleInResponse, setChatVisibleInResponse] = useState(true);
   // the result picked in go out, appended to the thread as Gemini's drafted plan
   const [goOutPick, setGoOutPick] = useState<RestaurantResult | null>(null);
+  // The play date's own beats. `playDateCard` is which of Gemini's two calendar cards is
+  // open — checking the Saturday, or confirming the event it wrote.
+  const [playDateFree, setPlayDateFree] = useState(false);
+  const [playDatePick, setPlayDatePick] = useState<RestaurantResult | null>(null);
+  const [playDateCard, setPlayDateCard] = useState<"none" | "schedule" | "calendar">("none");
+  // The voice update's beats: listening, then holding the message Gemini wrote, then sent.
+  const [voicePhase, setVoicePhase] = useState<"idle" | "recording" | "draft">("idle");
+  const [voiceSent, setVoiceSent] = useState(false);
   // The rundown pill that started the current flow, and the pills whose flows have been
   // finished this visit. A visitor working through one persona's menu sees what they've
   // done; going home to the persona picker is starting over, so it clears them.
@@ -260,7 +308,10 @@ export default function Home() {
   const showRundown = stage === "rundown";
   const showFridayNightChoice = stage === "fridayNightChoice";
   const showCityChoice = stage === "cityChoice";
-  const showChat = !showLanding && !showRundown && !showFridayNightChoice && !showCityChoice;
+  const showPartyChoice = stage === "partyChoice";
+  const showComplete = stage === "complete";
+  const showChat =
+    !showLanding && !showRundown && !showFridayNightChoice && !showCityChoice && !showPartyChoice && !showComplete;
   const composeExpanded = stage === "typed";
   const showHero = stage === "idle";
   const showResponse = stage === "response";
@@ -323,7 +374,10 @@ export default function Home() {
   // and now stay on it through the response — Gemini's answer floats over the thread
   // rather than replacing it. Stay in is the only one that eventually leaves.
   const showMessagesScene =
-    (activeDemo === "fridayNight" || activeDemo === "goOut") &&
+    (activeDemo === "fridayNight" ||
+      activeDemo === "goOut" ||
+      activeDemo === "playDate" ||
+      activeDemo === "voice") &&
     (showHero || composeExpanded || (showResponse && chatVisibleInResponse));
 
   // the city guides all share one demo id, so which one plays is the picked city's
@@ -335,12 +389,29 @@ export default function Home() {
   // is picked. Memoised because AnimatedThread keys its in-flight timer off this array's
   // identity — a fresh array each render would restart the message it's mid-way through.
   const messagesForScene = useMemo(() => {
+    // the play date's thread grows a beat at a time rather than being one fixed list
+    if (activeDemo === "playDate") {
+      if (playDatePick) {
+        return [
+          ...PLAY_DATE_THREAD_FREE,
+          { kind: "outgoing" as const, text: playDatePick.draftText },
+          ...PLAY_DATE_CONFIRM,
+        ];
+      }
+      return playDateFree ? PLAY_DATE_THREAD_FREE : PLAY_DATE_THREAD_ASK;
+    }
+    // the voice update's thread gains the message once it is actually sent
+    if (activeDemo === "voice") {
+      return voiceSent
+        ? [...VOICE_UPDATE.opening, { kind: "outgoing" as const, text: VOICE_UPDATE.message, instant: true }]
+        : VOICE_UPDATE.opening;
+    }
     const base = MESSAGES_BY_DEMO[activeDemo] ?? STAY_IN_MESSAGES;
     // guarded on the demo as well as the pick: the two branches are separate conversations,
     // so go out's drafted plan must never turn up appended to stay in's thread
     if (activeDemo !== "goOut" || !goOutPick) return base;
     return [...base, { kind: "outgoing" as const, text: goOutPick.draftText }, ...GO_OUT_SEARCH.replies];
-  }, [activeDemo, goOutPick]);
+  }, [activeDemo, goOutPick, playDateFree, playDatePick, voiceSent]);
 
   // The messaging app's own RCS field is part of the phone, so it stays put the whole time
   // the chat is up. Gemini's box doesn't trade places with it — it waits parked below the
@@ -361,6 +432,9 @@ export default function Home() {
   // the same thinking beat the answers reveal on, so the bar leaves as the content lands.
   const { contentShown: resultsUp } = useThinkingPhase(showResponse && ANSWER_DEMOS.has(activeDemo));
   const goOutResultsUp = resultsUp && activeDemo === "goOut";
+  // the play date's results are the same answer, so they earn the same "tap one" prompt
+  const pickResultsUp = resultsUp && (activeDemo === "goOut" || activeDemo === "playDate");
+  const pickedResult = activeDemo === "playDate" ? playDatePick : goOutPick;
   // The study notebook parks it for the whole demo: the notebook has an input of its own.
   const composeParked =
     (showMessagesScene && showHero) ||
@@ -370,19 +444,24 @@ export default function Home() {
   // cue and prompt each get their own moment instead of landing as one
   const [pickPromptDue, setPickPromptDue] = useState(false);
   useEffect(() => {
-    if (!goOutResultsUp) return;
+    if (!pickResultsUp) return;
     const t = setTimeout(() => setPickPromptDue(true), GO_OUT_CUE_DELAY_MS + PICK_PROMPT_AFTER_CUE_MS);
     return () => {
       clearTimeout(t);
       setPickPromptDue(false);
     };
-  }, [goOutResultsUp]);
-  const showPickPrompt = pickPromptDue && goOutResultsUp && !goOutPick;
+  }, [pickResultsUp]);
+  const showPickPrompt = pickPromptDue && pickResultsUp && !pickedResult;
 
   // Stable identities on purpose: the response components hold these in effect dependency
   // arrays alongside their own timers, so a fresh closure each render would tear down and
   // restart the timer every render and the sequence would never advance.
   const handleDemoComplete = useCallback(() => setDemoComplete(true), []);
+  // the play date ends on its calendar card rather than on the answer, so the way out
+  // arrives with it
+  useEffect(() => {
+    if (playDateCard === "calendar") setDemoComplete(true);
+  }, [playDateCard]);
   const handleLeaveChat = useCallback(() => setChatVisibleInResponse(false), []);
 
   // personas with a built rundown screen go there first; "add yourself" (no rundown design yet) skips straight to the blank chat
@@ -403,8 +482,13 @@ export default function Home() {
   // a flow counts as finished when the visitor takes its way out, which only appears once
   // it has played through — and that way out leads back to the menu it was started from
   const handleBackToRundown = () => {
-    if (activePill) setCompletedPills((done) => new Set(done).add(activePill));
-    setStage("rundown");
+    const done = activePill ? new Set(completedPills).add(activePill) : completedPills;
+    setCompletedPills(done);
+    // when every flow on this rundown has been played there is no rundown left to go back
+    // to — the persona's day is over, and that screen is where it ends
+    const pills = RUNDOWNS[rundownPersona.id]?.pills ?? [];
+    const allDone = pills.filter((pill) => pill.active).every((pill) => done.has(pill.id));
+    setStage(allDone ? "complete" : "rundown");
   };
 
   const handlePillSelect = (pillId: string) => {
@@ -421,7 +505,26 @@ export default function Home() {
       setStage("cityChoice");
       return;
     }
+    // and the parent's party branches per theme, the same way
+    if (pillId === "party") {
+      setStage("partyChoice");
+      return;
+    }
     const demo = PILL_DEMOS[pillId];
+    // the voice flow lives entirely in its thread, so it opens straight onto it
+    if (demo === "voice") {
+      resetVoice();
+      setActiveDemo(demo);
+      setStage("idle");
+      return;
+    }
+    // like go out, a re-run has to start from a clean thread
+    if (demo === "playDate") {
+      resetPlayDate();
+      setActiveDemo(demo);
+      setStage("idle");
+      return;
+    }
     // the notebook is its own app with its own input, so it skips the Ask Gemini typing
     // beat and opens straight onto its empty Sources tab
     if (demo === "notebook") {
@@ -442,6 +545,17 @@ export default function Home() {
   // This is the only way into either branch, so clearing the pick here is what guarantees
   // a run always starts from a clean thread — including re-running go out itself, where a
   // leftover pick would show the drafted plan already in the chat before it was asked for.
+  const resetVoice = () => {
+    setVoicePhase("idle");
+    setVoiceSent(false);
+  };
+
+  const resetPlayDate = () => {
+    setPlayDateFree(false);
+    setPlayDatePick(null);
+    setPlayDateCard("none");
+  };
+
   const handleFridayNightChoice = (choice: "goOut" | "stayIn") => {
     setGoOutPick(null);
     setChatVisibleInResponse(true);
@@ -455,6 +569,77 @@ export default function Home() {
     setCityId(cityId);
     setActiveDemo("city");
     setStage("typed");
+  };
+
+  // The theme picks the menu's backdrop, not the answer — all three play the same plan, as
+  // the design has it — so nothing but the route is needed here.
+  const handlePartySelect = (themeId: string) => {
+    void themeId;
+    setActiveDemo("party");
+    setStage("typed");
+  };
+
+  // The play date is one conversation with three chips in it, so which one shows — and what
+  // tapping it does — is the flow's state rather than a fixed per-demo value.
+  // the closing card names the lunch that was actually picked
+  const playDateCalendarCard = useMemo(
+    () => ({
+      ...PLAY_DATE_CALENDAR_CARD,
+      lines: PLAY_DATE_CALENDAR_CARD.lines.map((line) =>
+        line.replace("PLACE", playDatePick?.name ?? "lunch"),
+      ),
+    }),
+    [playDatePick],
+  );
+
+  // The voice flow's two taps: the mic starts it, the send arrow ends it. Everything
+  // between — the dictation arriving, the filler greying out and leaving — plays on its own,
+  // which is the pattern every other flow follows.
+  const voiceState = useMemo(
+    () =>
+      activeDemo === "voice" && !voiceSent
+        ? {
+            mode: voicePhase,
+            draft: VOICE_UPDATE.message,
+            onMic: () => setVoicePhase("recording"),
+            onSend: () => setVoiceSent(true),
+          }
+        : undefined,
+    [activeDemo, voicePhase, voiceSent],
+  );
+
+  // sending it is the end of the flow
+  useEffect(() => {
+    if (voiceSent) setDemoComplete(true);
+  }, [voiceSent]);
+
+  // Most demos finish inside the response layer; the voice update finishes in its thread,
+  // which is stage "idle" — so the way out follows the demo, not the stage.
+  // ...and the ending belongs to the chat: on any screen after it — the rundown, the
+  // persona's completed day — it would just be a second button in the same corner
+  const showEnding = demoComplete && showChat && (showResponse || activeDemo === "voice");
+
+  const playDateHandedBack = activeDemo === "playDate" && !!playDatePick;
+  // go out offers four results and the pick is the whole point; the play date offers three
+  // inside a conversation, so it asks for less
+  const pickPromptLabel = activeDemo === "playDate" ? "Tap a restaurant" : "Tap on your chosen restaurant";
+
+  const playDateSuggestion = useMemo(() => {
+    if (activeDemo !== "playDate") return undefined;
+    if (playDatePick) {
+      return { show: showResponse, title: PLAY_DATE_SUGGESTIONS.picked, onClick: () => setPlayDateCard("calendar") };
+    }
+    if (playDateFree) {
+      return { show: showHero, title: PLAY_DATE_SUGGESTIONS.free, onClick: () => setStage("typed") };
+    }
+    return { show: showHero, title: PLAY_DATE_SUGGESTIONS.ask, onClick: () => setPlayDateCard("schedule") };
+  }, [activeDemo, playDatePick, playDateFree, showHero, showResponse]);
+
+  // "Yes, I'm free" is the one message the visitor sends themselves; it closes the card and
+  // the thread carries on from there.
+  const handlePlayDateFree = () => {
+    setPlayDateCard("none");
+    setPlayDateFree(true);
   };
 
   const handleSuggestionTap = () => setStage("typed");
@@ -488,6 +673,14 @@ export default function Home() {
           <RundownScreen persona={rundownPersona} completed={completedPills} onBack={goHome} onSelectPill={handlePillSelect} />
         </div>
 
+        {/* the end of a persona's day: every flow played, nothing left on the rundown */}
+        <div
+          className="absolute inset-0 z-10 transition-opacity duration-500"
+          style={{ opacity: showComplete ? 1 : 0, pointerEvents: showComplete ? "auto" : "none" }}
+        >
+          <PersonaCompleteScreen persona={rundownPersona} onRestart={goHome} />
+        </div>
+
         {/* friday night branches into two demos — this picks which one before routing in */}
         <div
           className="absolute inset-0 z-10 transition-opacity duration-500"
@@ -502,7 +695,25 @@ export default function Home() {
           className="absolute inset-0 z-10 transition-opacity duration-500"
           style={{ opacity: showCityChoice ? 1 : 0, pointerEvents: showCityChoice ? "auto" : "none" }}
         >
-          <CityChoiceScreen onBack={() => setStage("rundown")} onSelect={handleCitySelect} />
+          <RotatingChoiceScreen
+            title="Explore a new city"
+            options={CITY_CHOICES}
+            onBack={() => setStage("rundown")}
+            onSelect={handleCitySelect}
+          />
+        </div>
+
+        {/* the parent's party branches per theme, on the same rotating screen */}
+        <div
+          className="absolute inset-0 z-10 transition-opacity duration-500"
+          style={{ opacity: showPartyChoice ? 1 : 0, pointerEvents: showPartyChoice ? "auto" : "none" }}
+        >
+          <RotatingChoiceScreen
+            title="Plan a kid’s birthday party"
+            options={PARTY_THEMES}
+            onBack={() => setStage("rundown")}
+            onSelect={handlePartySelect}
+          />
         </div>
 
         {/* The way out of a demo. The landing screen is home so it needs none, and the
@@ -543,24 +754,71 @@ export default function Home() {
               <MessagesScene
                 active={showMessagesScene}
                 messages={messagesForScene}
-                suggestion={
+                suggestion={playDateSuggestion ?? (
                   SUGGESTION_BY_DEMO[activeDemo]
                     ? { show: showHero, onClick: handleSuggestionTap, ...SUGGESTION_BY_DEMO[activeDemo]! }
                     : undefined
+                )}
+                thread={
+                  activeDemo === "playDate"
+                    ? PLAY_DATE_CONTACT
+                    : activeDemo === "voice"
+                      ? VOICE_UPDATE.thread
+                      : undefined
                 }
+                voice={voiceState}
                 showComposeBar={showMessagesScene}
                 // Gemini holds the foreground from the chip tap onward — first its compose
                 // bar, then its answer panel — so the chat behind it steps back for both.
                 // Picking a restaurant closes that panel and hands the thread back, so the
                 // drafted plan and the replies land at full brightness.
-                dimmed={showMessagesScene && !showHero && !goOutPick}
+                // Gemini holds the foreground whenever one of its own surfaces is up — the
+                // compose bar, an answer panel, a calendar card — so the chat steps back for
+                // all three, and comes back when the thread is handed the result.
+                dimmed={
+                  (showMessagesScene && !showHero && !pickedResult) ||
+                  (activeDemo === "playDate" && playDateCard !== "none")
+                }
               />
             </div>
+
+            {/* the voice capture, over the thread: the dictation, then Gemini's edit of it */}
+            {/* gated on the chat being the screen: these are the app's own surfaces, and a
+                surface left mounted over a screen it does not belong to goes on catching taps */}
+            {activeDemo === "voice" && showChat && voicePhase === "recording" && (
+              <VoiceCapture
+                transcript={VOICE_UPDATE.transcript}
+                show
+                onSettled={() => setVoicePhase("draft")}
+              />
+            )}
+
+            {/* Gemini's two calendar cards, over the thread: the free Saturday, then the
+                event it wrote. Both belong to the messaging app's surface, not to an
+                answer, so they live beside the scene rather than in the response layer. */}
+            {activeDemo === "playDate" && showChat && (
+              <>
+                <PlayDateOverlay
+                  card={PLAY_DATE_SCHEDULE_CARD}
+                  show={playDateCard === "schedule"}
+                  onAction={handlePlayDateFree}
+                />
+                <PlayDateOverlay card={playDateCalendarCard} show={playDateCard === "calendar"} />
+              </>
+            )}
 
             {/* response — the prompt bubble appears immediately, an inline "thinking" beat
                 follows, then the rest staggers in; which demo plays depends on which
                 rundown pill was tapped */}
-            <div className="absolute inset-0" style={{ opacity: showResponse ? 1 : 0, pointerEvents: showResponse ? "auto" : "none" }}>
+            <div
+              className="absolute inset-0"
+              style={{
+                opacity: showResponse ? 1 : 0,
+                // the play date hands the thread back once a restaurant is picked: its
+                // answer is gone, and this layer must stop covering the chip underneath it
+                pointerEvents: showResponse && !playDateHandedBack ? "auto" : "none",
+              }}
+            >
               {activeDemo === "fridayNight" ? (
                 <TaskAutomationResponse
                   content={FRIDAY_NIGHT_TASK}
@@ -602,6 +860,20 @@ export default function Home() {
                   active={showResponse}
                   onComplete={handleDemoComplete}
                 />
+              ) : activeDemo === "dinnerPlan" ? (
+                <DinnerPlanResponse
+                  // remounted per run: the dinner it picked and the order are per-run state
+                  key={showResponse ? "run" : "idle"}
+                  content={DINNER_PLAN}
+                  active={showResponse}
+                  onComplete={handleDemoComplete}
+                />
+              ) : activeDemo === "playDate" ? (
+                <GoOutResponse
+                  content={KID_RESTAURANTS}
+                  active={showResponse}
+                  onChoose={setPlayDatePick}
+                />
               ) : activeDemo === "goOut" ? (
                 <GoOutResponse
                   content={GO_OUT_SEARCH}
@@ -609,13 +881,15 @@ export default function Home() {
                   onComplete={handleDemoComplete}
                   onChoose={setGoOutPick}
                 />
-              ) : (
+              ) : responseContent ? (
+                // the messaging flows answer inside their own thread, so they reach here
+                // with nothing for the text pattern to render
                 <ScrollPattern
-                  content={responseContent!}
+                  content={responseContent}
                   active={showResponse}
                   onComplete={handleDemoComplete}
                 />
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -669,18 +943,32 @@ export default function Home() {
             {!multiLine && <img src="/gemini/icon-plus.svg" alt="" className="h-[2.57cqw] w-[2.57cqw] shrink-0" />}
 
             {multiLine && attachment && (
-              <div
-                className="-ml-[0.7cqw] flex max-w-[25cqw] shrink-0 items-center gap-[0.8cqw] self-start rounded-full bg-[#383838] pl-[1.2cqw] pr-[0.8cqw] [animation:fade-in-up_350ms_ease-out]"
-                style={{ height: `${ATTACHMENT_CHIP_CQW}cqw`, marginBottom: `${ATTACHMENT_GAP_CQW}cqw` }}
-              >
-                <img src={attachment.icon} alt="" className="h-[2cqw] w-[2cqw] shrink-0" />
-                <span className="min-w-0 truncate text-[1.55cqw] font-medium text-white">{attachment.name}</span>
-                <span className="flex h-[2cqw] w-[2cqw] shrink-0 items-center justify-center rounded-full bg-white text-[#1c1c1c]">
-                  <svg viewBox="0 0 24 24" className="h-[1.2cqw] w-[1.2cqw]" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round">
-                    <path d="M7 7l10 10M17 7L7 17" />
-                  </svg>
-                </span>
-              </div>
+              attachment.name ? (
+                <div
+                  className="-ml-[0.7cqw] flex max-w-[25cqw] shrink-0 items-center gap-[0.8cqw] self-start rounded-full bg-[#383838] pl-[1.2cqw] pr-[0.8cqw] [animation:fade-in-up_350ms_ease-out]"
+                  style={{ height: `${ATTACHMENT_CHIP_CQW}cqw`, marginBottom: `${ATTACHMENT_GAP_CQW}cqw` }}
+                >
+                  <img src={attachment.image} alt="" className="h-[2cqw] w-[2cqw] shrink-0" />
+                  <span className="min-w-0 truncate text-[1.55cqw] font-medium text-white">{attachment.name}</span>
+                  <CloseDot />
+                </div>
+              ) : (
+                // a photo needs no label — it is the thumbnail, with the same dismiss dot
+                // riding its top-right corner
+                <div
+                  className="relative shrink-0 self-start [animation:fade-in-up_350ms_ease-out]"
+                  style={{
+                    height: `${ATTACHMENT_CHIP_CQW}cqw`,
+                    width: `${ATTACHMENT_CHIP_CQW}cqw`,
+                    marginBottom: `${ATTACHMENT_GAP_CQW}cqw`,
+                  }}
+                >
+                  <img src={attachment.image} alt="" className="h-full w-full rounded-[1cqw] object-cover" />
+                  <span className="absolute -right-[0.5cqw] -top-[0.5cqw]">
+                    <CloseDot />
+                  </span>
+                </div>
+              )
             )}
 
             {/* sizes to its own content in both layouts — never flex-1/flex-grow (which would
@@ -743,13 +1031,13 @@ export default function Home() {
           className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 transition-[top,opacity] duration-500 ease-in-out"
           style={{ top: showPickPrompt ? `${PICK_PROMPT_TOP_CQW}cqw` : "58cqw", opacity: showPickPrompt ? 1 : 0 }}
         >
-          <PickPrompt active={showPickPrompt} />
+          <PickPrompt active={showPickPrompt} label={pickPromptLabel} />
         </div>
 
         {/* the demo's ending — floated into opposite bottom corners of the frame. The
             entrance animation always lives on a wrapper, never on the button itself, so it
             can't fight anything the button (or its rings) animate on `transform`. */}
-        {showResponse && demoComplete && (
+        {showEnding && (
           <>
             <div className="absolute bottom-[2.5cqw] right-[2.87cqw] z-20 [animation:fade-in-up_400ms_ease-out]">
               <BackToRundownButton onClick={handleBackToRundown} />

@@ -576,7 +576,11 @@ function PlaceCardRow({ place, size = 1 }: { place: PlaceCard; size?: number }) 
             {place.meta && <span style={{ color: "#8d8d8d" }}>{place.meta}</span>}
           </span>
         )}
-        {place.address && <span style={{ ...dim, color: "#8d8d8d" }}>📍 {place.address}</span>}
+        {place.address && (
+          <span style={{ ...dim, color: "#8d8d8d" }}>
+            {place.addressIcon ?? "📍"} {place.address}
+          </span>
+        )}
         {place.status && (
           <span style={dim}>
             <span style={{ color: place.statusTone === "closed" ? "#e9bab6" : "#56b969" }}>{place.status}</span>
@@ -765,6 +769,11 @@ export function buildContentBlocks(content: ResponseContent, size = 1): ContentB
   }
 
   content.sections.forEach((section) => {
+    // a lead sits above the heading, so it is pushed before it
+    section.lead?.forEach((para, i) => {
+      blocks.push({ id: `${section.id}-lead-${i}`, isHeading: true, keepWithNext: true, node: <p>{para}</p> });
+    });
+
     blocks.push({
       id: `${section.id}-heading`,
       isHeading: true,
@@ -807,7 +816,9 @@ export function buildContentBlocks(content: ResponseContent, size = 1): ContentB
     blocks.push({ id: "closing", isHeading: true, node: <p>{content.closingLines.join(" ")}</p> });
   }
 
-  blocks.push({ id: "footer", isHeading: true, node: <ResponseFooter size={size} /> });
+  if (!content.hideFooter) {
+    blocks.push({ id: "footer", isHeading: true, node: <ResponseFooter size={size} /> });
+  }
   return blocks;
 }
 

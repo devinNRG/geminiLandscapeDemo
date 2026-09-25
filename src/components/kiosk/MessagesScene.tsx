@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import type { ChatBubble } from "./types";
-import { CometRing } from "./shared";
+import type { ChatBubble, MessagesThread } from "./types";
+import { CometRing, PulseRings } from "./shared";
 import TypingLines from "./TypingLines";
 
-const CREW_AVATARS = [
-  "/gemini/friday-night/avatar-crew-1.png",
-  "/gemini/friday-night/avatar-crew-2.png",
-  "/gemini/friday-night/avatar-crew-3.png",
-  "/gemini/friday-night/avatar-crew-4.png",
-];
+/** The friday-night group chat, which is the thread this scene opens on by default. */
+const CREW_THREAD: MessagesThread = {
+  name: "The Crew",
+  avatars: [
+    "/gemini/friday-night/avatar-crew-1.png",
+    "/gemini/friday-night/avatar-crew-2.png",
+    "/gemini/friday-night/avatar-crew-3.png",
+    "/gemini/friday-night/avatar-crew-4.png",
+  ],
+};
 
 /**
  * The width of the simulated phone surface inside the kiosk's landscape frame.
@@ -94,19 +98,24 @@ const IMAGE = ["M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-
  * Its back arrow is scenery — part of the picture of a messaging app, like the RCS bar
  * below. The working way out of the demo is the kiosk's own button in the frame's corner.
  */
-function MessagesHeader() {
+function MessagesHeader({ thread }: { thread: MessagesThread }) {
+  const square = thread.avatars.length > 1;
   return (
     <div
       className="flex h-[5cqw] shrink-0 items-center gap-[0.94cqw] bg-[#201f23] pl-[2cqw]"
       style={{ width: PANEL_WIDTH, borderRadius: `${PANEL_RADIUS} ${PANEL_RADIUS} 0 0` }}
     >
       <Icon paths={ARROW_BACK} className="h-[1.87cqw] w-[1.87cqw] shrink-0 text-[#e4e1e7]" />
-      <div className="grid shrink-0 grid-cols-2 gap-[0.1cqw]" style={{ width: "3.13cqw", height: "3.13cqw" }}>
-        {CREW_AVATARS.map((src) => (
+      {/* a group is drawn as a two-by-two of its members; one person is just their photo */}
+      <div
+        className={square ? "grid shrink-0 grid-cols-2 gap-[0.1cqw]" : "shrink-0"}
+        style={{ width: "3.13cqw", height: "3.13cqw" }}
+      >
+        {thread.avatars.map((src) => (
           <img key={src} src={src} alt="" className="h-full w-full rounded-full object-cover" />
         ))}
       </div>
-      <span className="text-[1.4cqw] text-[#e4e1e7]">The Crew</span>
+      <span className="text-[1.4cqw] text-[#e4e1e7]">{thread.name}</span>
     </div>
   );
 }
@@ -195,7 +204,10 @@ function AnimatedThread({
     if (!active || placed >= messages.length) return;
     const m = messages[placed];
     const duration =
-      m.kind === "outgoing" ? m.text.length * CHAT_TICK_MS + CHAT_SETTLE_MS : CHAT_INDICATOR_MS + CHAT_SETTLE_MS;
+      m.kind === "outgoing"
+        ? // an instant message is already written, so it only needs its settling beat
+          (m.instant ? 0 : m.text.length * CHAT_TICK_MS) + CHAT_SETTLE_MS
+        : CHAT_INDICATOR_MS + CHAT_SETTLE_MS;
     const t = setTimeout(() => setPlaced((p) => p + 1), duration);
     return () => clearTimeout(t);
   }, [active, placed, messages]);
@@ -204,7 +216,7 @@ function AnimatedThread({
     <>
       {messages.slice(0, placed + 1).map((bubble, i) => (
         <div key={i} className="flex flex-col [animation:fade-in-up_400ms_ease-out]">
-          <ChatBubbleRow bubble={bubble} typing={i === placed} />
+          <ChatBubbleRow bubble={bubble} typing={i === placed && !(bubble.kind === "outgoing" && bubble.instant)} />
         </div>
       ))}
       {placed >= messages.length && trailing}
@@ -261,28 +273,90 @@ function MessagesSuggestionChip({ title, onClick }: { title: string; onClick: ()
  * Inert by construction — the whole scene is `pointer-events: none` from page.tsx, and
  * only the suggestion chip opts back in.
  */
-function MessagesComposeBar({ show }: { show: boolean }) {
+/** What the RCS bar is doing, for the one flow that uses it: waiting for the mic, listening,
+ * or holding a message Gemini wrote from what was said. */
+export type VoiceState = {
+  mode: "idle" | "recording" | "draft";
+  draft?: string;
+  onMic?: () => void;
+  onSend?: () => void;
+};
+
+function MessagesComposeBar({ show, voice }: { show: boolean; voice?: VoiceState }) {
+  const draft = voice?.mode === "draft" ? voice.draft : undefined;
   return (
     <div
-      className="absolute left-1/2 flex -translate-x-1/2 items-center gap-[0.62cqw] transition-opacity duration-500"
+      // a drafted message grows the field upward, and then the mic belongs on its bottom
+      // edge; with only the placeholder in it there is nothing to align to but the middle
+      className={`absolute left-1/2 flex -translate-x-1/2 gap-[0.62cqw] transition-opacity duration-500 ${
+        draft ? "items-end" : "items-center"
+      }`}
       style={{ width: PHONE_COLUMN, bottom: `${RCS_INSET_CQW}cqw`, opacity: show ? 1 : 0 }}
     >
-      <div className="flex h-[4.38cqw] flex-1 items-center gap-[1.25cqw] rounded-[2.8cqw] bg-[#201f23] px-[1.25cqw]">
-        <Icon paths={ADD_CIRCLE} className="h-[1.87cqw] w-[1.87cqw] shrink-0 text-[#c7c5d1]" />
+      <div
+        className={`flex flex-1 gap-[1.25cqw] rounded-[2.8cqw] bg-[#201f23] px-[1.25cqw] ${
+          draft ? "items-end" : "items-center"
+        }`}
+        style={{ minHeight: "4.38cqw", paddingTop: draft ? "0.9cqw" : undefined, paddingBottom: draft ? "0.9cqw" : undefined }}
+      >
+        <Icon paths={ADD_CIRCLE} className={`h-[1.87cqw] w-[1.87cqw] shrink-0 text-[#c7c5d1] ${draft ? "mb-[0.25cqw]" : ""}`} />
         <div className="flex min-w-0 flex-1 items-center gap-[0.08cqw]">
-          <span className="h-[1.87cqw] w-[0.06cqw] shrink-0 bg-[#e4e1e7]" />
-          <span className="truncate text-[1.25cqw] leading-[1.87cqw] text-[#c7c5d1]">RCS Message</span>
+          {!draft && <span className="h-[1.87cqw] w-[0.06cqw] shrink-0 bg-[#e4e1e7]" />}
+          {/* a drafted message wraps rather than truncating — it is the thing being sent,
+              not a placeholder, and the bar grows to hold it */}
+          <span
+            className={`min-w-0 text-[1.25cqw] leading-[1.87cqw] ${draft ? "text-[#e4e1e7]" : "truncate text-[#c7c5d1]"}`}
+          >
+            {draft ?? "RCS Message"}
+          </span>
         </div>
-        <div className="flex shrink-0 items-center gap-[1.87cqw]">
+        <div className={`flex shrink-0 items-center gap-[1.87cqw] ${draft ? "mb-[0.25cqw]" : ""}`}>
           <img src="/gemini/friday-night/msg-emoji.svg" alt="" className="h-[1.87cqw] w-[1.87cqw]" />
           <Icon paths={IMAGE} className="h-[1.87cqw] w-[1.87cqw] text-[#c7c5d1]" />
         </div>
       </div>
-      <div className="flex h-[4.38cqw] w-[4.38cqw] shrink-0 items-center justify-center rounded-full bg-[#583c61]">
-        <img src="/gemini/friday-night/msg-mic.svg" alt="" className="h-[1.87cqw] w-[1.87cqw]" />
-      </div>
+      <VoiceButton voice={voice} />
     </div>
   );
+}
+
+/**
+ * The bar's trailing button. Inert scenery in every flow but the voice one, where it is the
+ * way in (the mic, ringed like Send is once it is primed) and then the way out (the send
+ * arrow, once Gemini has a message ready). Both taps are the visitor's: the demo never sends
+ * a message on its own.
+ */
+function VoiceButton({ voice }: { voice?: VoiceState }) {
+  const mode = voice?.mode ?? "idle";
+  const live = !!voice && mode !== "recording";
+
+  const button = (
+    <button
+      type="button"
+      onClick={mode === "draft" ? voice?.onSend : voice?.onMic}
+      disabled={!live}
+      aria-label={mode === "draft" ? "Send to the team" : "Record a voice message"}
+      style={{ pointerEvents: live ? "auto" : "none" }}
+      className="flex h-[4.38cqw] w-[4.38cqw] shrink-0 items-center justify-center rounded-full transition-colors duration-300 active:brightness-90"
+    >
+      <span
+        className="flex h-full w-full items-center justify-center rounded-full"
+        style={{ backgroundColor: mode === "draft" ? "#c8bfe7" : "#583c61" }}
+      >
+        {mode === "draft" ? (
+          <svg viewBox="0 0 24 24" className="h-[1.87cqw] w-[1.87cqw] text-[#2a2141]" fill="currentColor" aria-hidden>
+            <path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z" />
+          </svg>
+        ) : (
+          <img src="/gemini/friday-night/msg-mic.svg" alt="" className="h-[1.87cqw] w-[1.87cqw]" />
+        )}
+      </span>
+    </button>
+  );
+
+  // the rings are the demo's "act here" everywhere else, so the mic and the send arrow earn
+  // them at the two moments the flow is waiting on a tap
+  return live ? <PulseRings active>{button}</PulseRings> : button;
 }
 
 /**
@@ -305,12 +379,18 @@ export default function MessagesScene({
   suggestion,
   showComposeBar = false,
   dimmed = false,
+  thread = CREW_THREAD,
+  voice,
 }: {
   active: boolean;
   messages: ChatBubble[];
   suggestion?: { show: boolean; onClick: () => void; title: string };
   showComposeBar?: boolean;
   dimmed?: boolean;
+  /** Who the thread is with. Defaults to the friday-night group chat. */
+  thread?: MessagesThread;
+  /** Only the voice flow passes this; without it the bar is the usual scenery. */
+  voice?: VoiceState;
 }) {
   return (
     <div
@@ -332,7 +412,7 @@ export default function MessagesScene({
         }}
       />
 
-      <MessagesHeader />
+      <MessagesHeader thread={thread} />
 
       {/* the sheet is the positioning context for everything anchored to the app's bottom
           edge — the RCS bar and the suggestion chip above it */}
@@ -368,7 +448,7 @@ export default function MessagesScene({
           />
         </div>
 
-        <MessagesComposeBar show={showComposeBar} />
+        <MessagesComposeBar show={showComposeBar} voice={voice} />
       </div>
     </div>
   );

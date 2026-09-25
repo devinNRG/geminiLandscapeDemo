@@ -642,3 +642,120 @@ Reference: `~/Downloads/cityContent/{austin,chicago,los angeles,new york,seattle
   photo of a laptop): each stop takes the nearest room or skyline in the asset set, and the FPO
   chip says so. `wk-city-nashville.jpg` is avoided — it has white letterbox bars baked in,
   which is why the reference's Austin card has them too.
+
+### 2026-09-24 — New screen: Plan a kid's birthday party (working parent)
+Reference: `~/Downloads/Screenshot 2026-09-24 at 11.06.22/11.06.27/11.06.40 PM.png`.
+- The parent's "Plan the party end to end" pill now opens a rotating choice screen —
+  Dinosaurs, Space, Ocean — over the three party photos already in the asset set
+  (`pick/party-dino.jpg`, `party-space.jpg`, `party-ocean.jpg`).
+- **Shared with the city screen:** `CityChoiceScreen` is now `RotatingChoiceScreen`, taking a
+  title and a list of options, so the two menus are one component. The city screen is
+  unchanged.
+- **Heading:** "Plan a kid's birthday party", per the reference — the rundown pill that opens
+  it still reads "Plan the party end to end".
+- **Not yet wired:** no party flow exists, so picking a theme holds the screen.
+  `handlePartySelect` in `page.tsx` is the seam.
+
+### 2026-09-24 — Party answer, and the parent menu's new copy
+Reference: `~/Downloads/partyContent/` and `~/Downloads/Screenshot 2026-09-24 at 11.10.55 PM.png`.
+- **Prompt:** "Help me plan my 7-year-old's birthday party. Recommend fun venues with good food
+  for 15 people, then create a shopping list for decorations and party supplies." The theme
+  picks the menu's backdrop, not the answer — all three play the same plan, as the design has it.
+- **Answer** (`PARTY_PLAN`): the intro, then Bounce Republic, Brick & Basil Pizza Kitchen and
+  Little Explorers Discovery Hall — each a heading, a place card (rating, category, `Open ·
+  Closes`), two paragraphs and Food / Party package / Good to know — then the shopping list
+  Gemini says it wrote to the notes (Decorations & Setup, Tableware, Cake & Dessert Service,
+  Party Favors & Utilities) and a numbered Action Checklist. It plays through ScrollPattern
+  like the other answers, and the Ask Gemini bar parks when it lands.
+- **Renderer:** two small additions — `PlaceCard.addressIcon` (the category's own mark in place
+  of the map pin) and `Section.lead` (a line that sits *above* a heading, for "a new list has
+  been added to your notes"). Both optional, so nothing else changes.
+- **Parent menu copy:** "Plan a kid's birthday party", "Schedule a play date", "Plan dinner for
+  the week", "Update the team". The first now matches the choice screen it opens.
+- **Photos** are the asset set's rooms again, as in the reference.
+
+### 2026-09-24 — New flow: Schedule a play date (working parent)
+Reference: `~/Downloads/Screenshot 2026-09-24 at 11.16.47/11.18.45/11.19.51/11.22.20 PM.png`
+and `~/Downloads/kidRestaurantContent/`.
+- The demo's longest conversation, and its most agentic: Camille asks, Gemini checks the
+  calendar, finds lunch and writes the event back, and the parent only ever taps what Gemini
+  offers. One thread with three Gemini Intelligence chips in it, a beat apart:
+  1. **Check Schedule** → a card over the thread: "You don't have anything scheduled on
+     Saturday", Sat Sep 12, "No events scheduled", and one action, **Yes, I'm free**. (The
+     design's second button, View Saturday, is dropped as asked.)
+  2. Tapping it sends "Yes, I'm free"; Camille asks about lunch; the chip becomes
+     **Find restaurants**, which brings the Ask Gemini bar up to type "Find me kid friendly
+     restaurants nearby for lunch".
+  3. The answer is the go out search's own shape, so it plays through `GoOutResponse`:
+     a map, the intro, and The Grove Cafe / Sunny Bowl / Petit Marche, each tappable, under a
+     "Tap a restaurant" prompt. Picking one drafts its message into the thread, Camille
+     confirms, and the chip becomes **Add Playdate to calendar**.
+  4. That opens the closing card — "Playdate added to your calendar", Sat Sep 12, the event
+     and the lunch that was actually picked — and ends the demo.
+- **Shared, not copied:** the thread is `MessagesScene` (its header now names the thread it is
+  showing, rather than being hardcoded to the group chat), the answer is `GoOutResponse`
+  (results can now carry their own category glyph), and only the two calendar cards are new
+  (`PlayDateOverlay`).
+- **One fix it surfaced:** the response layer kept covering the thread after the pick, so the
+  last chip could not be tapped. It now stops taking pointer events once the play date hands
+  the thread back.
+
+### 2026-09-24 — New flow: Plan dinner for the week (working parent)
+Reference: `~/Downloads/planDinner/` — flagged as older than the rest of the demo, so the
+flow is followed and the surfaces are the demo's own.
+- **Prompt:** "I need to use up what's in the fridge. Suggest 3 dinners based on what I have
+  and add any additional ingredients to a shopping list.", with a Fridge photo attachment chip
+  (`ph-fridge.jpg`) in the compose bar — the second flow to use the chip the weekend added.
+- **Answer:** the intro naming what's in the fridge, three dinners (Uses / Quick prep), then
+  the Quick Shopping List. Plays through `ContinuousFlow` like every other text answer.
+- **Then it becomes a task:** the three dinners are offered as chips under the answer; picking
+  one dims the other two, Gemini reports what it added, and a comet-ringed
+  "Order missing ingredients" chip follows. That hands off to the friday-night task's own
+  notification ("Finish up your task" → Open FreshCart) and then a light third-party card —
+  pickup, order summary, totals, Confirm pickup → "✓ Pickup confirmed" — which ends the demo.
+- **Taken away from the reference, to match the demo:** the dinner and order chips use the
+  demo's own chip language rather than the reference's flat grey pills; the FreshCart card is
+  drawn at the friday-night card's proportions rather than the portrait sheet's; and the
+  answer drops the rate/share/disclaimer row (new `ResponseContent.hideFooter`), since ending
+  an answer that continues into a task on a disclaimer reads as the end of the flow.
+
+### 2026-09-24 — New flow: Update the team (working parent)
+Reference: `~/Downloads/voiceMeeting/`.
+- The only flow whose input is spoken. The thread ("The team", Priya asking how the meeting
+  went) opens with the RCS bar's mic ringed; tapping it starts the capture over the thread:
+  1. the dictation arrives word by word, ums and restarts and all, over a blue band whose
+     gradient slides and breathes (`voice-wave`);
+  2. the filler greys out — the judgement made visible, which is the claim of the flow;
+  3. the greyed words lift, blur and sparkle away (`word-drop`, `word-sparkle`);
+  4. what is left closes up into the message.
+- **Where the taps are** (the question asked): **three** — the mic to start, the tick to accept
+  Gemini's edit, and Send. That is the demo's own pattern: it opens on a tap, plays Gemini's
+  work on its own, and the visitor commits at each real decision. The tick is the same kind of
+  tap as "pick a restaurant" or "Yes, I'm free" — accepting Gemini's work — and Send is how
+  every flow in the demo posts a message; no flow sends one by itself. The design's blue
+  "Send to the team" button is dropped as asked: the RCS bar's own send arrow is the control,
+  and it wears the same pulse rings Send does everywhere else (which also replaces the
+  reference's "Tap the mic to start" pill, since there is no band below the phone to put it in).
+- **Shared:** the thread is `MessagesScene` again; its RCS bar — until now scenery in every
+  flow — gained an optional `voice` state so its mic and send arrow can be live here and stay
+  inert everywhere else.
+- **One fix it surfaced:** the response layer fell through to the text pattern for flows that
+  answer inside their own thread, which crashed on undefined content. It now renders nothing.
+
+### 2026-09-25 — Voice message posts whole; a completed-day screen per persona
+Reference: `~/Downloads/studentComplete.png`, `parentComplete.png`, `travelerComplete.png`.
+- **The sent voice message no longer types itself in.** Gemini had already written it and the
+  visitor had already read it in the bar, so retyping it in the bubble undid the flow's point.
+  New `ChatBubble.instant` posts a message whole; only that one message uses it.
+- **Completed-day screen:** once every active pill on a persona's rundown has been played, the
+  last flow's "Back to your rundown" lands here instead — there is no rundown left to go back
+  to. It reads the day back as its four outcomes, checked, on that persona's own rundown
+  backdrop, with the demo's usual ending furniture in the corners: the QR in one, "Start
+  again" (which goes home and clears the checks) in the other. Copy per persona from the
+  screenshots (`COMPLETIONS` in `types.ts`).
+- **Two pointer-events bugs it surfaced**, both the same shape as before:
+  - the play date's calendar card and the voice capture stayed mounted over whatever screen
+    came next, so the card swallowed taps on the rundown; both are now gated on the chat
+    being the screen;
+  - the finished flow's "Back to your rundown" sat on top of the completion screen's "Start
+    again" in the same corner; the ending is now gated on the chat too.

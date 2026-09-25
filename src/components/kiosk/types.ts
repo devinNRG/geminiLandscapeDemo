@@ -33,6 +33,9 @@ export type PlaceCard = {
   /** Review count and price band, dimmed after the star, e.g. "· (1.2K)" or "· (860) · $140 a night" */
   meta?: string;
   address?: string;
+  /** The glyph before `address`. Defaults to the map pin; the party answer uses the
+   * category's own mark instead (a pizzeria, a museum). */
+  addressIcon?: string;
   /** Coloured lead-in on the status row, e.g. "Hotel", "Open", "Closed" */
   status?: string;
   /** Green for open/available (the default), a soft red for closed. */
@@ -51,6 +54,9 @@ export type Section = {
   /** Prose between the card and the bullets — one <p> per entry, wrapping naturally
    * at whatever width it's given, exactly like `introLines`. */
   body?: string[];
+  /** Prose *above* the heading — a line that introduces the section rather than sitting
+   * under it, like the party answer's "a new list has been added to your notes". */
+  lead?: string[];
   /** Bulleted facts with a bold lead-in label. Wraps naturally: unlike `items` below
    * these are authored as whole sentences, not as pre-broken display lines. */
   bullets?: PlaceBullet[];
@@ -71,6 +77,9 @@ export type ResponseContent = {
   map?: MapCard;
   /** Optional — the band tour answer goes straight from its map into its first section. */
   introLines?: string[];
+  /** Leave off the rate/share/disclaimer row. For an answer that is a step in a task
+   * rather than a finished reply — ending one mid-flow on a disclaimer reads as the end. */
+  hideFooter?: boolean;
   /** Section headings in regular weight rather than bold — the newer design files draw
    * them that way; the older weekend answer keeps its bold. */
   plainHeadings?: boolean;
@@ -502,7 +511,9 @@ export const FRIDAY_NIGHT_TASK: TaskDemoContent = {
  * "go out" branch's later confirmation exchange, so the bubble styling lives
  * in one place (`MessagesScene.tsx`) instead of being re-authored per screen. */
 export type ChatBubble =
-  | { kind: "outgoing"; text: string }
+  /** `instant` posts the message whole instead of typing it out — for one Gemini has
+   * already written, where watching it be retyped would undo the point of the flow. */
+  | { kind: "outgoing"; text: string; instant?: boolean }
   | { kind: "incoming"; name: string; avatar: string; text: string };
 
 export const STAY_IN_MESSAGES: ChatBubble[] = [
@@ -517,6 +528,9 @@ export const STAY_IN_MESSAGES: ChatBubble[] = [
  * thread. It replaces the usual idle "Ask Gemini" pill: tapping it is what brings
  * Gemini's own compose bar up from the bottom of the screen.
  */
+/** Who a thread is with — the name and avatars its header shows. */
+export type MessagesThread = { name: string; avatars: string[] };
+
 export type MessagesSuggestion = { title: string };
 
 /** Picks up on Marco's "let's do our usual order". */
@@ -539,6 +553,8 @@ export type RestaurantResult = {
   rating: string;
   /** Category line under the rating, shown beside the vegetarian badge. */
   category: string;
+  /** Glyph before `category`. Defaults to the vegetarian badge the go out answer uses. */
+  categoryIcon?: string;
   /** Dimmed text after the green "Open", e.g. "\u00b7 Closes 11:00 PM" */
   closesAt: string;
   image: string;
@@ -1011,13 +1027,14 @@ export const DINNER_RESERVATION: DinnerContent = {
 };
 
 /**
- * "Explore a new city" — the choice screen between the traveler's pill and a city's own
- * flow. Its backdrop rotates through the five cities on offer, so the screen shows what it
- * is asking about rather than picking one city's photo to stand for all of them.
+ * One option on a rotating choice screen (`RotatingChoiceScreen`): its label, and the photo
+ * the backdrop shows while it is up. The screen rotates through them, so it shows what it is
+ * asking about rather than picking one option's photo to stand for all of them.
  */
-export type CityChoice = { id: string; label: string; image: string };
+export type RotatingChoice = { id: string; label: string; image: string };
 
-export const CITY_CHOICES: CityChoice[] = [
+/** "Explore a new city" — between the traveler's pill and a city's own day plan. */
+export const CITY_CHOICES: RotatingChoice[] = [
   { id: "austin", label: "Austin", image: "/v81-image-assets-inuse/assets/pick/city-aus.jpg" },
   { id: "chicago", label: "Chicago", image: "/v81-image-assets-inuse/assets/pick/city-chi.jpg" },
   { id: "los-angeles", label: "Los Angeles", image: "/v81-image-assets-inuse/assets/pick/city-la.jpg" },
@@ -1439,6 +1456,528 @@ export const CITY_GUIDES: Record<string, ResponseContent> = {
   },
 };
 
+/**
+ * "Plan a kid's birthday party" — the parent's answer, reached through the theme menu. The
+ * theme picks the menu's backdrop, not the answer: all three play this one plan, which is
+ * how the design has it. Two halves in one scroll — three venues, then the shopping list
+ * Gemini says it has written to the parent's notes, ending on a numbered checklist.
+ */
+export const PARTY_PLAN: ResponseContent = {
+  promptLines: [
+    "Help me plan my 7-year-old\u2019s birthday party. Recommend fun venues with good food for 15 people, then create a shopping list for decorations and party supplies.",
+  ],
+  introLines: [
+    "Here are three fun venues with good food for a party of 15, then the shopping list for decorations and party supplies:",
+  ],
+  plainHeadings: true,
+  sections: [
+    {
+      id: "bounce",
+      heading: "Bounce Republic \u00b7 party rooms \u00b7 8 min",
+      place: {
+        name: "Bounce Republic",
+        rating: "4.7",
+        address: "Trampoline park",
+        status: "Open",
+        statusTail: "\u00b7 Closes 8:00 PM",
+        image: "/v81-image-assets-inuse/assets/wk-sf-2-int.jpg",
+      },
+      body: [
+        "Bounce Republic is a trampoline park on Mill Road with private party rooms for up to 20 and a parents\u2019 coffee bar upstairs.",
+        "The 15-guest package covers the jump session, the room and the food, so one booking does the whole afternoon.",
+      ],
+      bullets: [
+        { label: "Food:", text: "Pizza, fruit platters and juice boxes for the party; the coffee bar upstairs for the parents." },
+        { label: "Party package:", text: "Ninety minutes of jump time, then a private room for an hour; socks and wristbands included." },
+        { label: "Good to know:", text: "Weekend slots book out three to four weeks ahead." },
+      ],
+    },
+    {
+      id: "brick-basil",
+      heading: "Brick & Basil Pizza Kitchen \u00b7 make your own \u00b7 6 min",
+      place: {
+        name: "Brick & Basil Pizza Kitchen",
+        rating: "4.6",
+        address: "Pizzeria",
+        addressIcon: "\ud83c\udf7d\ufe0f",
+        status: "Open",
+        statusTail: "\u00b7 Closes 9:00 PM",
+        image: "/v81-image-assets-inuse/assets/wk-nola-2-int.jpg",
+      },
+      body: [
+        "Brick & Basil Pizza Kitchen is a family pizzeria on Orchard Road where the kids top their own pizzas at the counter; the back room seats 20.",
+        "Making the pizzas is the activity, so the food and the entertainment are the same booking.",
+      ],
+      bullets: [
+        { label: "Food:", text: "Make-your-own pizzas, garlic bread and gelato; a nut free kitchen." },
+        { label: "Party package:", text: "The back room for two hours, with aprons and chef hats for every child." },
+        { label: "Good to know:", text: "A cake from outside is welcome, no fee." },
+      ],
+    },
+    {
+      id: "little-explorers",
+      heading: "Little Explorers Discovery Hall \u00b7 museum party \u00b7 12 min",
+      place: {
+        name: "Little Explorers Discovery Hall",
+        rating: "4.8",
+        address: "Children\u2019s museum",
+        addressIcon: "\ud83c\udfdb\ufe0f",
+        status: "Open",
+        statusTail: "\u00b7 Closes 5:00 PM",
+        image: "/v81-image-assets-inuse/assets/wk-nashville-2-int.jpg",
+      },
+      body: [
+        "Little Explorers Discovery Hall is a hands-on children\u2019s museum on Riverside Avenue with a party cafe and a room for cake.",
+        "The exhibits keep fifteen seven-year-olds busy for the whole afternoon, and the cafe does the lunch.",
+      ],
+      bullets: [
+        { label: "Food:", text: "A party lunch in the cafe: sandwiches, fruit and a cupcake tower; allergy menus on request." },
+        { label: "Party package:", text: "A guided exhibit hour, then the party room for lunch and cake." },
+        { label: "Good to know:", text: "Admission for four adults is included." },
+      ],
+    },
+    {
+      id: "decorations",
+      lead: [
+        "A new list titled \u201c7th Birthday Party Supplies & Decorations\u201d has been added to your notes:",
+      ],
+      heading: "Decorations & Setup",
+      bullets: [
+        { text: "1 \u00d7 Giant Number \u201c7\u201d foil balloon" },
+        { text: "1 \u00d7 Themed balloon garland/arch kit (with handheld pump)" },
+        { text: "1 \u00d7 \u201cHappy Birthday\u201d banner / photo backdrop" },
+        { text: "2\u20133 \u00d7 Heavy-duty disposable tablecloths" },
+      ],
+    },
+    {
+      id: "tableware",
+      heading: "Tableware (for 15+ Guests)",
+      bullets: [
+        { text: "15\u201320 \u00d7 9-inch lunch/dinner plates" },
+        { text: "15\u201320 \u00d7 7-inch dessert/cake plates" },
+        { text: "50 \u00d7 Beverage napkins & matching cups" },
+        { text: "1 \u00d7 Compostable cutlery pack (forks & spoons)" },
+      ],
+    },
+    {
+      id: "cake",
+      heading: "Cake & Dessert Service",
+      bullets: [
+        { text: "Birthday candles & matches/lighter" },
+        { text: "Cake stand & cake serving knife/spatula" },
+        { text: "Cake/cupcake order (15\u201320 servings)" },
+      ],
+    },
+    {
+      id: "favors",
+      heading: "Party Favors & Utilities",
+      bullets: [
+        { text: "15 \u00d7 Party favor bags (filled with age-appropriate stickers, mini puzzles, or treats)" },
+        { text: "1 \u00d7 Permanent marker / Sharpie (to label drink cups)" },
+        { text: "1 \u00d7 Roll of heavy-duty cleanup trash bags" },
+      ],
+    },
+    {
+      id: "checklist",
+      heading: "Action Checklist",
+      numbered: true,
+      bullets: [
+        {
+          label: "Confirm Venue Headcount:",
+          text: "Select and lock in the 15-guest package with your chosen venue 3\u20134 weeks in advance to secure preferred weekend time slots.",
+        },
+        {
+          label: "Order Cake & Supplies:",
+          text: "Place bakery orders 2 weeks prior and verify dietary restrictions for all 15 attending children.",
+        },
+        {
+          label: "Pre-pack Favor Bags:",
+          text: "Assemble favor bags and test the balloon pump 48 hours before the event.",
+        },
+      ],
+    },
+  ],
+};
+
+/** "Plan the party end to end" — between the parent's pill and a theme's own flow. */
+export const PARTY_THEMES: RotatingChoice[] = [
+  { id: "dinosaurs", label: "Dinosaurs", image: "/v81-image-assets-inuse/assets/pick/party-dino.jpg" },
+  { id: "space", label: "Space", image: "/v81-image-assets-inuse/assets/pick/party-space.jpg" },
+  { id: "ocean", label: "Ocean", image: "/v81-image-assets-inuse/assets/pick/party-ocean.jpg" },
+];
+
+/**
+ * "Schedule a play date" — the parent's RCS flow, and the longest conversation in the demo:
+ * Gemini reads the thread, checks the calendar, finds lunch and writes the event back, with
+ * the parent only ever tapping what Gemini offers.
+ *
+ * The thread grows a beat at a time (`PLAY_DATE_THREAD_*`), and each beat ends with its own
+ * Gemini Intelligence chip. `PlayDateOverlay` draws the two calendar cards.
+ */
+export const PLAY_DATE_CONTACT: MessagesThread = {
+  name: "Camille Walsh",
+  avatars: ["/v81-image-assets-inuse/assets/msg/av-camille.png"],
+};
+
+const CAMILLE = { kind: "incoming" as const, name: "Camille Walsh", avatar: "/v81-image-assets-inuse/assets/msg/av-camille.png" };
+
+/** Opening: Camille asks, and the chip offers to check the calendar. */
+export const PLAY_DATE_THREAD_ASK: ChatBubble[] = [
+  { ...CAMILLE, text: "Are you free Saturday morning at 10am for a playdate?" },
+];
+
+/** After "Yes, I'm free" is sent: Camille asks about lunch. */
+export const PLAY_DATE_THREAD_FREE: ChatBubble[] = [
+  ...PLAY_DATE_THREAD_ASK,
+  { kind: "outgoing", text: "Yes, I\u2019m free" },
+  { ...CAMILLE, text: "Maybe afterwards we can grab lunch at a kid friendly restaurant nearby. Any suggestions?" },
+];
+
+/** Camille's answer once a restaurant has been picked; the pick's own draft goes between. */
+export const PLAY_DATE_CONFIRM: ChatBubble[] = [{ ...CAMILLE, text: "Perfect! See you Saturday at 10am" }];
+
+export const PLAY_DATE_SUGGESTIONS = {
+  ask: "Check Schedule",
+  free: "Find restaurants",
+  picked: "Add Playdate to calendar",
+};
+
+/** The card Gemini opens over the thread. `actions` is empty on the closing one — by then
+ * there is nothing left to answer. */
+export type PlayDateCard = {
+  title: string;
+  weekday: string;
+  month: string;
+  day: string;
+  lines: string[];
+  action?: string;
+};
+
+export const PLAY_DATE_SCHEDULE_CARD: PlayDateCard = {
+  title: "You don\u2019t have anything scheduled on Saturday",
+  weekday: "Sat",
+  month: "Sep",
+  day: "12",
+  lines: ["No events scheduled"],
+  action: "Yes, I\u2019m free",
+};
+
+export const PLAY_DATE_CALENDAR_CARD: PlayDateCard = {
+  title: "Playdate added to your calendar",
+  weekday: "Sat",
+  month: "Sep",
+  day: "12",
+  lines: ["Playdate \u00b7 10:00 AM", "Lunch after at PLACE"],
+};
+
+/** The answer behind "Find restaurants" — the same shape the go out search uses, so it
+ * plays through `GoOutResponse`: a map, an intro, then three tappable results. */
+export const KID_RESTAURANTS: RestaurantSearchContent = {
+  promptLines: ["Find me kid friendly restaurants nearby for lunch"],
+  loadingCaption: "Connecting to Google Maps\u2026",
+  map: {
+    image: "/v81-image-assets-inuse/assets/map-venue-la.jpg",
+    aspectRatio: 2,
+    pinColor: "#F1BF42",
+    pins: [
+      { label: "Sunny Bowl", x: 0.52, y: 0.2, side: "right" },
+      { label: "The Grove Cafe", x: 0.245, y: 0.45, side: "right" },
+      { label: "Petit Marche", x: 0.66, y: 0.7, side: "right" },
+    ],
+  },
+  introText: "Here are several kid-friendly restaurants located nearby for lunch:",
+  results: [
+    {
+      id: "grove",
+      heading: "The Grove Cafe \u00b7 nut free kitchen \u00b7 2 min",
+      name: "The Grove Cafe",
+      rating: "4.6",
+      category: "Cafe",
+      categoryIcon: "\u2615",
+      closesAt: "\u00b7 Closes 4:00 PM",
+      image: "/v81-image-assets-inuse/assets/wk-nola-2-int.jpg",
+      body: [
+        "The Grove Cafe is a bright neighbourhood cafe on Park Lane with a nut free kitchen and a small play corner by the window.",
+        "It is the closest of the three, and the kitchen is fully nut free rather than nut aware, which is what the thread asked for.",
+      ],
+      bullets: [
+        { label: "Kids\u2019 menu:", text: "Mini pancakes, grilled cheese and fruit cups; high chairs and crayons at every table." },
+        { label: "Atmosphere:", text: "Family tables and a play corner with books and blocks, busiest from noon." },
+        { label: "Good to know:", text: "No booking for lunch; two minutes on foot from the park, stroller parking inside the door." },
+      ],
+      draftText: "Lunch at The Grove Cafe? Fully nut free kitchen, two minutes from the park.",
+    },
+    {
+      id: "sunny",
+      heading: "Sunny Bowl \u00b7 nut free options \u00b7 5 min",
+      name: "Sunny Bowl",
+      rating: "4.5",
+      category: "Bowls",
+      categoryIcon: "\ud83e\udd57",
+      closesAt: "\u00b7 Closes 5:00 PM",
+      image: "/v81-image-assets-inuse/assets/wk-miami-2-int.jpg",
+      body: [
+        "Sunny Bowl is a build-your-own bowl spot on Grove Street with allergens labelled on every bowl and a covered patio.",
+        "The nut free options are marked on the board rather than asked for, and the patio has room for two families.",
+      ],
+      bullets: [
+        { label: "Kids\u2019 menu:", text: "Half-size bowls with rice, chicken or tofu and a fruit side; the nut free dressings are marked." },
+        { label: "Atmosphere:", text: "Casual counter service, a covered patio with picnic tables, lively at lunch." },
+        { label: "Good to know:", text: "Order at the counter and pay by phone; a changing table in the family restroom." },
+      ],
+      draftText: "Lunch at Sunny Bowl? Allergens marked on every bowl, and a patio for the kids.",
+    },
+    {
+      id: "petit",
+      heading: "Petit Marche \u00b7 kids menu \u00b7 6 min",
+      name: "Petit Marche",
+      rating: "4.7",
+      category: "Bakery cafe",
+      categoryIcon: "\u2615",
+      closesAt: "\u00b7 Closes 3:00 PM",
+      image: "/v81-image-assets-inuse/assets/wk-sf-2-int.jpg",
+      body: [
+        "Petit Marche is a small bakery cafe on Orchard Road with a proper kids\u2019 menu and a garden at the back.",
+        "The garden gives the kids room to run after the play date, and the lunch kitchen is nut free; only the pastry counter is not.",
+      ],
+      bullets: [
+        { label: "Kids\u2019 menu:", text: "Ham and cheese croissants, mini quiches and a pasta of the day; babycinos on request." },
+        { label: "Atmosphere:", text: "Quiet indoors, a small garden with a sandpit out the back." },
+        { label: "Good to know:", text: "Closes at 3:00 PM on Saturdays, so lunch before one; the pastry counter shares a kitchen with nuts, the lunch menu does not." },
+      ],
+      draftText: "Lunch at Petit Marche? Kids menu, nut aware.",
+    },
+  ],
+  replies: PLAY_DATE_CONFIRM,
+};
+
+/**
+ * "Plan dinner for the week" — the parent's second task flow. It opens like an answer
+ * (three dinners built out of what the fridge photo shows, plus the shopping list) and ends
+ * like the friday-night task: a Gemini Intelligence notification, then a third-party app
+ * card to finish in. Rendered by `DinnerPlanResponse.tsx`.
+ */
+export type DinnerIdea = {
+  id: string;
+  name: string;
+  /** What tapping this dinner adds, as Gemini reports it back. */
+  added: string;
+};
+
+export type PickupItem = { id: string; name: string; price: string };
+
+export type PickupOrder = {
+  appName: string;
+  pickupLabel: string;
+  pickupDetail: string;
+  itemCount: string;
+  items: PickupItem[];
+  subtotal: string;
+  pickupFee: string;
+  taxes: string;
+  total: string;
+  confirmLabel: string;
+  confirmedLabel: string;
+};
+
+export type DinnerPlanContent = {
+  answer: ResponseContent;
+  /** The dinners offered as chips under the answer; tapping one adds its ingredients. */
+  ideas: DinnerIdea[];
+  orderLabel: string;
+  /** The task's own beats, auto-advancing; the last one carries the button into the app. */
+  notification: { eyebrow: string; steps: TaskStep[]; cta: string };
+  order: PickupOrder;
+};
+
+export const DINNER_PLAN: DinnerPlanContent = {
+  answer: {
+    promptLines: [
+      "I need to use up what\u2019s in the fridge. Suggest 3 dinners based on what I have and add any additional ingredients to a shopping list.",
+    ],
+    introLines: [
+      "I spotted chicken, eggs, bell peppers, onions, shredded cheese, carrots, and leftover rice in your fridge! Here are 3 easy dinners to make the most of what you have, plus a quick shopping list to round them out:",
+    ],
+    plainHeadings: true,
+    // the answer carries on into the task below it, so it does not close with a disclaimer
+    hideFooter: true,
+    sections: [
+      {
+        id: "pasta-bake",
+        heading: "Veggie Pasta Bake",
+        bullets: [
+          { label: "Uses:", text: "Peppers, onions, cheese" },
+          {
+            label: "Quick prep:",
+            text: "Saut\u00e9 the veggies, toss with pasta and marinara, top with melted cheese, and bake until bubbly.",
+          },
+        ],
+      },
+      {
+        id: "fajita",
+        heading: "Chicken Fajita Night",
+        bullets: [
+          { label: "Uses:", text: "Chicken breast, peppers, onions, cheese" },
+          {
+            label: "Quick prep:",
+            text: "Season chicken and veggie strips, roast on a sheet pan, and serve in warm tortillas with melted cheese.",
+          },
+        ],
+      },
+      {
+        id: "fried-rice",
+        heading: "Fried Rice with Peas",
+        bullets: [
+          { label: "Uses:", text: "Leftover rice, eggs, peas, carrots, onion" },
+          {
+            label: "Quick prep:",
+            text: "Scramble the eggs, stir-fry the veggies and rice with a splash of soy sauce, and fold everything together.",
+          },
+        ],
+      },
+      {
+        id: "shopping",
+        heading: "\ud83d\uded2 Quick Shopping List",
+        bullets: [
+          { text: "Pasta & marinara sauce" },
+          { text: "Tortillas & fajita seasoning" },
+          { text: "Soy sauce" },
+        ],
+      },
+    ],
+  },
+  ideas: [
+    { id: "pasta-bake", name: "Veggie Pasta Bake", added: "Pasta and marinara sauce added to your shopping list." },
+    { id: "fajita", name: "Chicken Fajita Night", added: "Tortillas and fajita seasoning added to your shopping list." },
+    { id: "fried-rice", name: "Fried Rice with Peas", added: "Soy sauce added to your shopping list." },
+  ],
+  orderLabel: "Order missing ingredients",
+  notification: {
+    eyebrow: "Gemini Intelligence",
+    steps: [
+      { id: "opening", heading: "Working on your task", subtext: "Opening FreshCart\u2026", progress: 0.2 },
+      { id: "cart", heading: "Task in progress", subtext: "Adding pasta and marinara sauce to your cart", progress: 0.55 },
+      { id: "slot", heading: "Task in progress", subtext: "Reserving a pickup slot at the Hillhurst Ave store", progress: 0.85 },
+      { id: "finish", heading: "Finish up your task", subtext: "Your pickup order is ready. Please confirm in the FreshCart app." },
+    ],
+    cta: "Open FreshCart",
+  },
+  order: {
+    appName: "FreshCart",
+    pickupLabel: "FreshCart",
+    pickupDetail: "Hillhurst Ave store \u00b7 ready from 5:30 PM",
+    itemCount: "2 items",
+    items: [
+      { id: "pasta", name: "Pasta, 500g", price: "$1.90" },
+      { id: "marinara", name: "Marinara sauce, 700g jar", price: "$2.60" },
+    ],
+    subtotal: "$4.50",
+    pickupFee: "Free",
+    taxes: "$0.60",
+    total: "$5.10",
+    confirmLabel: "Confirm pickup",
+    confirmedLabel: "Pickup confirmed",
+  },
+};
+
+/**
+ * "Update the team" — the parent's voice flow, and the only one whose input is spoken.
+ *
+ * `transcript` is the raw dictation, split so the animation can tell the two kinds of word
+ * apart: `keep: false` is the hesitation Gemini drops — the ums, the restarts, the numbers
+ * said twice — and what is left is the update. `message` is what is actually sent: the kept
+ * words, tidied into sentences the way a transcription would be, which is why it is authored
+ * rather than derived.
+ */
+export type VoiceSegment = { text: string; keep?: boolean };
+
+export type VoiceUpdateContent = {
+  thread: MessagesThread;
+  opening: ChatBubble[];
+  transcript: VoiceSegment[];
+  message: string;
+};
+
+export const VOICE_UPDATE: VoiceUpdateContent = {
+  thread: {
+    name: "The team",
+    avatars: [
+      "/v81-image-assets-inuse/assets/msg/av-a0.png",
+      "/v81-image-assets-inuse/assets/msg/av-a1.png",
+      "/v81-image-assets-inuse/assets/msg/av-a2.png",
+      "/v81-image-assets-inuse/assets/msg/av-a3.png",
+    ],
+  },
+  opening: [
+    {
+      kind: "incoming",
+      name: "Priya",
+      avatar: "/v81-image-assets-inuse/assets/msg/av-a1.png",
+      text: "How did the meeting go today?",
+    },
+  ],
+  transcript: [
+    { text: "Okay so, um," },
+    { text: "hey team,", keep: true },
+    { text: "quick update," },
+    { text: "quick update on", keep: true },
+    { text: "the, on" },
+    { text: "the negotiation. It ran over, we closed at,", keep: true },
+    { text: "uh, ten past three, no, sorry, quarter past," },
+    { text: "quarter past three.", keep: true },
+    { text: "Um, clause four, no wait," },
+    { text: "clauses four and seven, both agreed.", keep: true },
+    { text: "Uh, signature copies," },
+    { text: "the signature copies go out tomorrow morning.", keep: true },
+    { text: "And, um," },
+    { text: "I\u2019ll do", keep: true },
+    { text: "the," },
+    { text: "the full summary tonight,", keep: true },
+    { text: "after," },
+    { text: "after pickup.", keep: true },
+    { text: "Okay, yeah, that\u2019s it." },
+  ],
+  message:
+    "Hey team, quick update on the negotiation. It ran over, we closed at quarter past three. Clauses 4 and 7 both agreed. The signature copies go out tomorrow morning. I\u2019ll do the full summary tonight, after pickup.",
+};
+
+/**
+ * The screen a persona's story ends on, once every one of their rundown pills has been
+ * played: their day, read back as four things that got done. Reached from the last flow's
+ * "Back to your rundown" — there is no rundown left to go back to, only this.
+ */
+export type PersonaCompletion = { title: string; items: string[] };
+
+export const COMPLETIONS: Record<string, PersonaCompletion> = {
+  student: {
+    title: "That\u2019s the student\u2019s day, completed",
+    items: [
+      "The semester: Every date on the calendar, one overview",
+      "Friday night: Decision made and dinner planned.",
+      "The tour: Timings, hotels and food, planned",
+      "A study notebook: Guide, quiz and flash cards",
+    ],
+  },
+  traveler: {
+    title: "That\u2019s the traveler\u2019s day, completed",
+    items: [
+      "The briefing: Syntherva Systems on one page",
+      "The weekend: Built around everyone\u2019s preferences.",
+      "Saturday dinner: Found and booked",
+      "A new city: Explored, stop by stop",
+    ],
+  },
+  parent: {
+    title: "That\u2019s the parent\u2019s day, completed",
+    items: [
+      "The party: Planned, invite made",
+      "Dinner: From this morning\u2019s fridge photo",
+      "The play date: Lunch found, confidently yes",
+      "The client update: Sent clean by voice",
+    ],
+  },
+};
+
 export type Persona = {
   id: string;
   /** Who they are, as the landing pill's first line — a role, not an age ("Student", not "The student, 20"). */
@@ -1539,10 +2078,10 @@ export const RUNDOWNS: Record<string, RundownData> = {
     // and the kit in it, with the empty dark interior landing right where the pills go.
     bgImage: "/v81-image-assets-inuse/assets/pick/parent-suv3.jpg",
     pills: [
-      { id: "party", label: "Plan the party end to end" },
-      { id: "play-date", label: "Answer the play date" },
-      { id: "tonight-dinner", label: "What can we make tonight?" },
-      { id: "voice-update", label: "Send the update by voice" },
+      { id: "party", label: "Plan a kid\u2019s birthday party", active: true },
+      { id: "play-date", label: "Schedule a play date", active: true },
+      { id: "tonight-dinner", label: "Plan dinner for the week", active: true },
+      { id: "voice-update", label: "Update the team", active: true },
     ],
   },
 };
