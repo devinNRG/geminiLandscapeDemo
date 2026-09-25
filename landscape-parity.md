@@ -775,3 +775,18 @@ Reference: `~/Downloads/Screenshot 2026-09-25 at 12.00.55/12.01.06/12.01.18 AM.p
   which is what lets the two animate apart).
 - Only the first load sees it: every way back — Start again, the corner button — goes to the
   picker, and the intro is the initial stage rather than a screen anything routes to.
+
+### 2026-09-25 — Menu screens rise in and sink out
+- Every menu's heading and buttons now move as they fade: arriving content travels up into
+  place, leaving content falls out of it. One rule does both, since the hidden state is the
+  same either way — below its place and transparent (`riseStyle` in `shared.tsx`, 520ms).
+- The stacks stagger on the way in (70ms apart, in reading order) and leave all at once, so
+  the last item is never still going as the next screen arrives.
+- **Driven by a `show` prop, not a mount animation.** These screens are mounted the whole
+  session and only cross-fade, so a CSS mount animation plays once at start-up and never
+  again — which is why the completed-day list's stagger never actually played on arrival.
+- **One thing it forced:** the rundown's pills are now keyed by slot rather than by pill id.
+  The persona changes in the same commit that shows the screen, so id keys remounted every
+  button straight into its final state, leaving nothing to transition from.
+- Applies to the persona picker, the rundown, the friday-night fork, both rotating choice
+  screens and the completed-day screen.

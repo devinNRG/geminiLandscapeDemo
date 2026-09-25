@@ -1,7 +1,7 @@
 "use client";
 
 import { RUNDOWNS, type Persona } from "./types";
-import { BackButton, FpoChip } from "./shared";
+import { BackButton, FpoChip, riseStyle } from "./shared";
 
 /**
  * The personalized "Hi, where should we start?" menu shown right after a
@@ -23,10 +23,13 @@ import { BackButton, FpoChip } from "./shared";
 export default function RundownScreen({
   persona,
   completed,
+  show,
   onBack,
   onSelectPill,
 }: {
   persona: Persona;
+  /** Whether this is the screen on show — its content rises in and sinks out on it. */
+  show: boolean;
   completed: ReadonlySet<string>;
   onBack: () => void;
   onSelectPill: (pillId: string) => void;
@@ -72,20 +75,27 @@ export default function RundownScreen({
       {/* pointer-events-none: purely decorative text — without this its full-width box
           (even though the text itself is centered) sits above the back button in paint
           order and swallows clicks meant for it */}
-      <p className="relative z-10 pointer-events-none pt-[5.63cqw] text-center text-[4cqw] leading-[4.4cqw] text-white">
+      <p
+        className="relative z-10 pointer-events-none pt-[5.63cqw] text-center text-[4cqw] leading-[4.4cqw] text-white"
+        style={riseStyle(show)}
+      >
         Hi, where should we start?
       </p>
 
       <div className="relative z-10 mt-auto flex w-full flex-col items-center pb-[2.71cqw]">
         <div className="flex w-[48cqw] flex-col gap-[1cqw]">
-          {data.pills.map((pill) => {
+          {data.pills.map((pill, i) => {
             const done = pill.active && completed.has(pill.id);
             return (
               <button
-                key={pill.id}
+                // keyed by slot, not by pill: the persona changes in the same commit that
+                // shows this screen, and keying by id would remount every button into its
+                // final state — with nothing to transition from, the rise would be skipped
+                key={i}
                 type="button"
                 disabled={!pill.active}
                 onClick={() => onSelectPill(pill.id)}
+                style={riseStyle(show, i + 1)}
                 /* same darker glass as the landing pills, for the same reason — a white veil
                    over a photo flattens it, a black tint keeps the photo readable through it.
                    A finished flow steps back between live and disabled: dimmer than a pill

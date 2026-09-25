@@ -331,6 +331,35 @@ export function GradientPillButton({ onClick, children }: { onClick: () => void;
   );
 }
 
+/** How far a menu's content sits below its place while it is off screen. */
+const RISE_CQW = 1.8;
+const RISE_MS = 520;
+/** Gap between one item rising and the next, so a stack arrives in reading order. */
+const RISE_STAGGER_MS = 70;
+
+/**
+ * The motion every menu screen's content shares: it rises into place as the screen arrives
+ * and sinks as it leaves.
+ *
+ * One rule does both, because the hidden state is the same either way — below its place and
+ * transparent. Arriving, the content travels up into position; leaving, it falls back out of
+ * it. Screens are mounted the whole time and only cross-fade, so this is driven by `show`
+ * rather than by a mount animation, which would play once at start-up and never again.
+ *
+ * `index` staggers a stack on the way in and is ignored on the way out: a screen should
+ * leave all at once, or the last item is still going as the next screen arrives.
+ */
+export function riseStyle(show: boolean, index = 0): CSSProperties {
+  return {
+    opacity: show ? 1 : 0,
+    transform: `translateY(${show ? "0cqw" : `${RISE_CQW}cqw`})`,
+    transitionProperty: "opacity, transform",
+    transitionDuration: `${RISE_MS}ms`,
+    transitionTimingFunction: "cubic-bezier(0.2, 0.7, 0.2, 1)",
+    transitionDelay: show ? `${index * RISE_STAGGER_MS}ms` : "0ms",
+  };
+}
+
 /**
  * The way out, in the frame's top-left corner — on every screen past the landing one.
  *

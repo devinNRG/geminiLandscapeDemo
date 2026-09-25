@@ -1,6 +1,6 @@
 "use client";
 
-import { BackButton, FpoChip } from "./shared";
+import { BackButton, FpoChip, riseStyle } from "./shared";
 
 /**
  * Sits between picking the "Sort Friday night" pill and playing a demo — the
@@ -9,9 +9,12 @@ import { BackButton, FpoChip } from "./shared";
  * in" (the FoodOrder task-automation flow).
  */
 export default function FridayNightChoiceScreen({
+  show,
   onBack,
   onSelect,
 }: {
+  /** Whether this is the screen on show — its content rises in and sinks out on it. */
+  show: boolean;
   onBack: () => void;
   onSelect: (choice: "goOut" | "stayIn") => void;
 }) {
@@ -41,7 +44,10 @@ export default function FridayNightChoiceScreen({
       <BackButton onClick={onBack} />
 
       {/* named after the pill that opens it, at the same display size as the menu before it */}
-      <p className="relative z-10 pointer-events-none pt-[5.63cqw] text-center text-[4cqw] leading-[4.4cqw] text-white">
+      <p
+        className="relative z-10 pointer-events-none pt-[5.63cqw] text-center text-[4cqw] leading-[4.4cqw] text-white"
+        style={riseStyle(show)}
+      >
         Make plans for Friday night
       </p>
 
@@ -50,6 +56,7 @@ export default function FridayNightChoiceScreen({
           <button
             type="button"
             onClick={() => onSelect("goOut")}
+            style={riseStyle(show, 1)}
             className="flex h-[5.16cqw] items-center rounded-full border border-white/12 bg-black/45 px-[2.66cqw] text-left text-[1.6cqw] font-medium leading-[2cqw] text-white backdrop-blur-2xl transition-transform duration-150 active:scale-[0.97]"
           >
             Go out
@@ -57,6 +64,7 @@ export default function FridayNightChoiceScreen({
           <button
             type="button"
             onClick={() => onSelect("stayIn")}
+            style={riseStyle(show, 2)}
             className="flex h-[5.16cqw] items-center rounded-full border border-white/12 bg-black/45 px-[2.66cqw] text-left text-[1.6cqw] font-medium leading-[2cqw] text-white backdrop-blur-2xl transition-transform duration-150 active:scale-[0.97]"
           >
             Order in

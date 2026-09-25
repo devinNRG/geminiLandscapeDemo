@@ -1,7 +1,7 @@
 "use client";
 
 import { PERSONAS, type Persona } from "../types";
-import { FpoChip } from "../shared";
+import { FpoChip, riseStyle } from "../shared";
 
 /**
  * The persona picker — now the only landing layout (the earlier full-height
@@ -18,7 +18,14 @@ import { FpoChip } from "../shared";
  * age. The subtitle under the heading is what carries the framing the old
  * single question used to.
  */
-export default function GlassPillsLayout({ onSelect }: { onSelect: (persona: Persona) => void }) {
+export default function GlassPillsLayout({
+  show,
+  onSelect,
+}: {
+  /** Whether this is the screen on show — its content rises in and sinks out on it. */
+  show: boolean;
+  onSelect: (persona: Persona) => void;
+}) {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-black">
       {/* A plain centered cover, with none of the zoom/pan the previous backdrop needed: this
@@ -50,7 +57,7 @@ export default function GlassPillsLayout({ onSelect }: { onSelect: (persona: Per
 
       <FpoChip />
 
-      <div className="relative z-10 pointer-events-none flex flex-col items-center gap-[0.7cqw] pt-[5.2cqw] text-center">
+      <div className="relative z-10 pointer-events-none flex flex-col items-center gap-[0.7cqw] pt-[5.2cqw] text-center" style={riseStyle(show)}>
         {/* a display step above the 2.9cqw every other screen's heading sits at — this is the
             one screen with nothing above it in the flow, so it opens rather than continues */}
         <p className="text-[4cqw] leading-[4.4cqw] text-white">Choose a story</p>
@@ -59,12 +66,13 @@ export default function GlassPillsLayout({ onSelect }: { onSelect: (persona: Per
 
       <div className="relative z-10 mt-auto flex w-full flex-col items-center pb-[3.5cqw]">
         <div className="flex w-[48cqw] flex-col gap-[1cqw]">
-          {PERSONAS.map((persona) => (
+          {PERSONAS.map((persona, i) => (
             <button
               key={persona.id}
               type="button"
               disabled={!persona.active}
               onClick={() => onSelect(persona)}
+              style={riseStyle(show, i + 1)}
               /* Glass over a dark tint rather than over a white one: a white veil on a photo
                  this dark washes to a flat grey and the refraction stops reading, where a
                  black tint keeps the photo visible through it and lets the hairline border do

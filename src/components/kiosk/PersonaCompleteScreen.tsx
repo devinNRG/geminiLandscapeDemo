@@ -1,7 +1,7 @@
 "use client";
 
 import { COMPLETIONS, RUNDOWNS, type Persona } from "./types";
-import { FpoChip, GradientPillButton } from "./shared";
+import { FpoChip, GradientPillButton, riseStyle } from "./shared";
 
 /**
  * Where a persona's story ends: every flow on their rundown has been played, so there is no
@@ -12,7 +12,16 @@ import { FpoChip, GradientPillButton } from "./shared";
  * started. The ending's own furniture is the demo's: the QR in one bottom corner and the
  * way on in the other, exactly where every finished flow puts them.
  */
-export default function PersonaCompleteScreen({ persona, onRestart }: { persona: Persona; onRestart: () => void }) {
+export default function PersonaCompleteScreen({
+  persona,
+  show,
+  onRestart,
+}: {
+  persona: Persona;
+  /** Whether this is the screen on show — its content rises in and sinks out on it. */
+  show: boolean;
+  onRestart: () => void;
+}) {
   const completion = COMPLETIONS[persona.id];
   const rundown = RUNDOWNS[persona.id];
   if (!completion || !rundown) return null;
@@ -39,7 +48,10 @@ export default function PersonaCompleteScreen({ persona, onRestart }: { persona:
       />
       <FpoChip />
 
-      <p className="relative z-10 pointer-events-none shrink-0 pt-[4.2cqw] text-center text-[4cqw] leading-[4.4cqw] text-white">
+      <p
+        className="relative z-10 pointer-events-none shrink-0 pt-[4.2cqw] text-center text-[4cqw] leading-[4.4cqw] text-white"
+        style={riseStyle(show)}
+      >
         {completion.title}
       </p>
 
@@ -52,7 +64,7 @@ export default function PersonaCompleteScreen({ persona, onRestart }: { persona:
               key={item}
               className="flex items-center gap-[1.6cqw] rounded-[2.6cqw] border border-white/12 bg-black/45 px-[2.4cqw] py-[1.1cqw] backdrop-blur-2xl"
               // the four land in turn rather than all at once — the day being totted up
-              style={{ animation: "fade-in-up 500ms ease-out both", animationDelay: `${i * 140}ms` }}
+              style={riseStyle(show, i + 1)}
             >
               <svg
                 viewBox="0 0 24 24"
@@ -72,12 +84,12 @@ export default function PersonaCompleteScreen({ persona, onRestart }: { persona:
         </ul>
       </div>
 
-      <div className="absolute bottom-[2.5cqw] left-[2.87cqw] z-10 flex items-center gap-[0.9cqw]">
+      <div className="absolute bottom-[2.5cqw] left-[2.87cqw] z-10 flex items-center gap-[0.9cqw]" style={riseStyle(show, 5)}>
         <img src="/gemini/qr-code.jpg" alt="" className="h-[5cqw] w-[5cqw] rounded-[0.5cqw] object-cover" />
         <span className="max-w-[7cqw] text-[0.95cqw] leading-[1.2cqw] text-muted">Scan to try Gemini on your phone</span>
       </div>
 
-      <div className="absolute bottom-[2.5cqw] right-[2.87cqw] z-10">
+      <div className="absolute bottom-[2.5cqw] right-[2.87cqw] z-10" style={riseStyle(show, 5)}>
         <GradientPillButton onClick={onRestart}>Start again</GradientPillButton>
       </div>
     </div>

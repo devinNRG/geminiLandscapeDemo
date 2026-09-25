@@ -675,7 +675,7 @@ export default function Home() {
           className="absolute inset-0 z-10 transition-opacity duration-500"
           style={{ opacity: showLanding ? 1 : 0, pointerEvents: showLanding ? "auto" : "none" }}
         >
-          <GlassPillsLayout onSelect={handlePersonaSelect} />
+          <GlassPillsLayout show={showLanding} onSelect={handlePersonaSelect} />
         </div>
 
         {/* rundown — the persona's personalized "here's your daily rundown" suggestion screen */}
@@ -683,7 +683,13 @@ export default function Home() {
           className="absolute inset-0 z-10 transition-opacity duration-500"
           style={{ opacity: showRundown ? 1 : 0, pointerEvents: showRundown ? "auto" : "none" }}
         >
-          <RundownScreen persona={rundownPersona} completed={completedPills} onBack={goHome} onSelectPill={handlePillSelect} />
+          <RundownScreen
+            persona={rundownPersona}
+            completed={completedPills}
+            show={showRundown}
+            onBack={goHome}
+            onSelectPill={handlePillSelect}
+          />
         </div>
 
         {/* the intro, above everything: it is what the kiosk opens on */}
@@ -699,7 +705,7 @@ export default function Home() {
           className="absolute inset-0 z-10 transition-opacity duration-500"
           style={{ opacity: showComplete ? 1 : 0, pointerEvents: showComplete ? "auto" : "none" }}
         >
-          <PersonaCompleteScreen persona={rundownPersona} onRestart={goHome} />
+          <PersonaCompleteScreen persona={rundownPersona} show={showComplete} onRestart={goHome} />
         </div>
 
         {/* friday night branches into two demos — this picks which one before routing in */}
@@ -707,7 +713,11 @@ export default function Home() {
           className="absolute inset-0 z-10 transition-opacity duration-500"
           style={{ opacity: showFridayNightChoice ? 1 : 0, pointerEvents: showFridayNightChoice ? "auto" : "none" }}
         >
-          <FridayNightChoiceScreen onBack={() => setStage("rundown")} onSelect={handleFridayNightChoice} />
+          <FridayNightChoiceScreen
+            show={showFridayNightChoice}
+            onBack={() => setStage("rundown")}
+            onSelect={handleFridayNightChoice}
+          />
         </div>
 
         {/* "Explore a new city" branches per city — five of them, so it gets its own screen
@@ -719,6 +729,7 @@ export default function Home() {
           <RotatingChoiceScreen
             title="Explore a new city"
             options={CITY_CHOICES}
+            show={showCityChoice}
             onBack={() => setStage("rundown")}
             onSelect={handleCitySelect}
           />
@@ -732,6 +743,7 @@ export default function Home() {
           <RotatingChoiceScreen
             title="Plan a kid’s birthday party"
             options={PARTY_THEMES}
+            show={showPartyChoice}
             onBack={() => setStage("rundown")}
             onSelect={handlePartySelect}
           />

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { RotatingChoice } from "./types";
-import { BackButton, FpoChip } from "./shared";
+import { BackButton, FpoChip, riseStyle } from "./shared";
 
 /** How long each city holds before the next one comes up. */
 const HOLD_MS = 4200;
@@ -26,10 +26,13 @@ const FADE_MS = 1400;
 export default function RotatingChoiceScreen({
   title,
   options,
+  show,
   onBack,
   onSelect,
 }: {
   title: string;
+  /** Whether this is the screen on show — its content rises in and sinks out on it. */
+  show: boolean;
   options: RotatingChoice[];
   onBack: () => void;
   onSelect: (id: string) => void;
@@ -67,17 +70,21 @@ export default function RotatingChoiceScreen({
       <BackButton onClick={onBack} />
 
       {/* at the same display size as the menu before it */}
-      <p className="relative z-10 pointer-events-none pt-[5.63cqw] text-center text-[4cqw] leading-[4.4cqw] text-white">
+      <p
+        className="relative z-10 pointer-events-none pt-[5.63cqw] text-center text-[4cqw] leading-[4.4cqw] text-white"
+        style={riseStyle(show)}
+      >
         {title}
       </p>
 
       <div className="relative z-10 mt-auto flex w-full flex-col items-center pb-[2.71cqw]">
         <div className="flex w-[48cqw] flex-col gap-[1cqw]">
-          {options.map((option) => (
+          {options.map((option, i) => (
             <button
               key={option.id}
               type="button"
               onClick={() => onSelect(option.id)}
+              style={riseStyle(show, i + 1)}
               className="flex h-[5.16cqw] items-center rounded-full border border-white/12 bg-black/45 px-[2.66cqw] text-left text-[1.6cqw] font-medium leading-[2cqw] text-white backdrop-blur-2xl transition-transform duration-150 active:scale-[0.97]"
             >
               {option.label}
