@@ -323,7 +323,7 @@ export function GradientPillButton({ onClick, children }: { onClick: () => void;
       <button
         type="button"
         onClick={onClick}
-        className="pointer-events-auto rounded-full bg-[linear-gradient(90deg,#4a82f6_0%,#436feb_40%,#6199f6_100%)] px-[1.8cqw] py-[1cqw] text-[1.2cqw] font-medium whitespace-nowrap text-white active:brightness-90"
+        className="rounded-full bg-[linear-gradient(90deg,#4a82f6_0%,#436feb_40%,#6199f6_100%)] px-[1.8cqw] py-[1cqw] text-[1.2cqw] font-medium whitespace-nowrap text-white active:brightness-90"
       >
         {children}
       </button>
@@ -861,7 +861,7 @@ export function ContinuousFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contentShown, blocks.length]);
 
-  const thinkingCaptions = ["Thinking…", "Putting your answer together…"];
+  const thinkingCaptions = content.loading ? [content.loading.caption] : ["Thinking…", "Putting your answer together…"];
 
   return (
     <div className="flex flex-col text-white" style={{ fontSize: `${1.25 * size}cqw`, lineHeight: `${1.8 * size}cqw` }}>
@@ -876,7 +876,7 @@ export function ContinuousFlow({
         {showThinking && (
           <div className="absolute left-0" style={{ top: `calc(100% + ${1.3 * size}cqw)` }}>
             <Reveal show={active} index={0.5}>
-              <ThinkingIndicator captions={thinkingCaptions} />
+              <ThinkingIndicator captions={thinkingCaptions} icon={content.loading?.icon} />
             </Reveal>
           </div>
         )}

@@ -15,13 +15,19 @@ import { BackButton, FpoChip } from "./shared";
  * The heading sits at the landing screen's display size rather than a step
  * down from it: this is the screen the visitor actually chooses from, so it
  * opens the same way the picker before it did.
+ *
+ * Pills in `completed` are flows the visitor has already finished from this
+ * menu: a check on the left and a step dimmer, but still live, since going
+ * back through one is a perfectly good thing to do on a kiosk.
  */
 export default function RundownScreen({
   persona,
+  completed,
   onBack,
   onSelectPill,
 }: {
   persona: Persona;
+  completed: ReadonlySet<string>;
   onBack: () => void;
   onSelectPill: (pillId: string) => void;
 }) {
@@ -72,23 +78,44 @@ export default function RundownScreen({
 
       <div className="relative z-10 mt-auto flex w-full flex-col items-center pb-[2.71cqw]">
         <div className="flex w-[48cqw] flex-col gap-[1cqw]">
-          {data.pills.map((pill) => (
-            <button
-              key={pill.id}
-              type="button"
-              disabled={!pill.active}
-              onClick={() => onSelectPill(pill.id)}
-              /* same darker glass as the landing pills, for the same reason — a white veil
-                 over a photo flattens it, a black tint keeps the photo readable through it */
-              className={`flex h-[5.16cqw] items-center rounded-full border px-[2.66cqw] text-left text-[1.6cqw] font-medium leading-[2cqw] backdrop-blur-2xl transition-transform duration-150 ${
-                pill.active
-                  ? "border-white/12 bg-black/45 text-white active:scale-[0.97]"
-                  : "pointer-events-none border-white/8 bg-black/25 text-white/40"
-              }`}
-            >
-              {pill.label}
-            </button>
-          ))}
+          {data.pills.map((pill) => {
+            const done = pill.active && completed.has(pill.id);
+            return (
+              <button
+                key={pill.id}
+                type="button"
+                disabled={!pill.active}
+                onClick={() => onSelectPill(pill.id)}
+                /* same darker glass as the landing pills, for the same reason — a white veil
+                   over a photo flattens it, a black tint keeps the photo readable through it.
+                   A finished flow steps back between live and disabled: dimmer than a pill
+                   still to do, clearly brighter than one that can't be tapped at all. */
+                className={`flex h-[5.16cqw] items-center gap-[1.1cqw] rounded-full border px-[2.66cqw] text-left text-[1.6cqw] font-medium leading-[2cqw] backdrop-blur-2xl transition-transform duration-150 ${
+                  !pill.active
+                    ? "pointer-events-none border-white/8 bg-black/25 text-white/40"
+                    : done
+                      ? "border-white/10 bg-black/35 text-white/65 active:scale-[0.97]"
+                      : "border-white/12 bg-black/45 text-white active:scale-[0.97]"
+                }`}
+              >
+                {done && (
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-label="Completed"
+                    className="h-[1.7cqw] w-[1.7cqw] shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.4}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M4.5 12.5l5 5L19.5 7" />
+                  </svg>
+                )}
+                {pill.label}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

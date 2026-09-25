@@ -82,7 +82,7 @@ Routing lives in `page.tsx` as `PILL_DEMOS` (pill id → `DemoId`) and
 task-automation flow). Every other rundown pill across every persona is
 intentionally disabled — only these three actually go anywhere:
 
-1. **Weekend planning** — traveler persona, "Sort the friend's weekend" pill.
+1. **Weekend planning** — traveler persona, "Plan a weekend getaway" pill.
   A normal generated text answer: intro, then sections of pre-broken
    `items` (the older list shape). Content lives in `types.ts` as
    `WEEKEND_RESPONSE` (`ResponseContent` shape). Its tail — the fifth "The

@@ -328,7 +328,7 @@ function NotebookInput({
               onClick={onSend}
               disabled={!primed}
               aria-label="Send"
-              className="pointer-events-auto flex h-[3.2cqw] w-[3.2cqw] items-center justify-center rounded-full bg-[#2b2c2e] text-white transition-opacity duration-300 active:brightness-90 disabled:opacity-50"
+              className="flex h-[3.2cqw] w-[3.2cqw] items-center justify-center rounded-full bg-[#2b2c2e] text-white transition-opacity duration-300 active:brightness-90 disabled:opacity-50"
             >
               <svg viewBox="0 0 24 24" className="h-[1.5cqw] w-[1.5cqw]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14M13 6l6 6-6 6" />
@@ -574,7 +574,7 @@ function Quiz({ content }: { content: StudyNotebookContent }) {
         type="button"
         onClick={flip}
         aria-label={flipped ? "Show the question" : "Show the answer"}
-        className="pointer-events-auto mt-[0.9cqw] block h-[9.8cqw] w-full [perspective:120cqw]"
+        className="mt-[0.9cqw] block h-[9.8cqw] w-full [perspective:120cqw]"
       >
         <div
           className="relative h-full w-full transition-transform duration-500 ease-out [transform-style:preserve-3d]"
@@ -616,7 +616,7 @@ function NavButton({ dir, disabled, onClick }: { dir: "left" | "right"; disabled
       onClick={onClick}
       disabled={disabled}
       aria-label={dir === "left" ? "Previous question" : "Next question"}
-      className="pointer-events-auto flex h-[3.1cqw] w-[3.1cqw] items-center justify-center rounded-full transition-colors duration-200 active:brightness-90"
+      className="flex h-[3.1cqw] w-[3.1cqw] items-center justify-center rounded-full transition-colors duration-200 active:brightness-90"
       style={{ backgroundColor: disabled ? "#121313" : "#333537", color: disabled ? "#4a4b4c" : "#fff" }}
     >
       <Chevron dir={dir} className="h-[1.5cqw] w-[1.5cqw]" />
@@ -650,7 +650,7 @@ function AudioOverview({ audio }: { audio: StudyNotebookContent["audio"] }) {
             type="button"
             onClick={() => setPlaying(true)}
             aria-label="Play the audio overview"
-            className="pointer-events-auto flex h-[3.1cqw] w-[3.1cqw] items-center justify-center rounded-full bg-[#2b2c2e] text-white active:brightness-90"
+            className="flex h-[3.1cqw] w-[3.1cqw] items-center justify-center rounded-full bg-[#2b2c2e] text-white active:brightness-90"
           >
             <PlayGlyph className="h-[1.4cqw] w-[1.4cqw]" />
           </button>

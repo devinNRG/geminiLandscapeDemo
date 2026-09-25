@@ -501,3 +501,144 @@ Reference: `~/Downloads/Study notebook/` (screenshots 2026-09-24, 4.15–4.17 PM
 - **Shared:** "Start the Biology quiz" and "Back to your rundown" are now one component,
   `GradientPillButton` in `shared.tsx`.
 - Not carried over: the reference's "FPO" chip — there's no stand-in photo on these screens.
+
+### 2026-09-24 — Finished flows are checked off on the persona's menu
+- "Back to your rundown" returns to the menu the flow was started from and marks that pill
+  done: a check on the left, text and glass a step dimmer, still tappable to replay.
+- Checks persist while the visitor stays within the persona (moving between its flows);
+  going home to the persona picker, by either back button, clears them.
+- Go out and Stay in both mark "Make plans for Friday night", the pill they share.
+- Where: `completedPills` / `activePill` and `goHome` / `handleBackToRundown` in `page.tsx`;
+  the `completed` prop on `RundownScreen`.
+
+### 2026-09-24 — Traveler menu copy
+- Pills now read "Plan a weekend getaway", "Prep for the big meeting", "Make a dinner
+  reservation", "Explore a new city" (reference: `~/Downloads/Screenshot 2026-09-24 at 9.43.11 PM.png`).
+  Labels only — pill ids are unchanged, so "Plan a weekend getaway" still opens the existing
+  weekend demo, and the other three stay disabled until they're built.
+
+### 2026-09-24 — Ask Gemini bar: attachment chip, no mic while typing, roomier spacing
+Reference: `~/Downloads/Screenshot 2026-09-24 at 9.45.25 PM.png`.
+- **Weekend prompt:** "Help us plan our weekend trip to NYC. Suggest some things to do based
+  on our preferences in the attached Google Sheet. Make a packing list." (`WEEKEND_RESPONSE`
+  now feeds both the compose bar and the answer's prompt bubble.)
+- **Attachment chip:** a Google Sheets chip, "NYC weekend preferences" (truncates as drawn),
+  with a close glyph, at the top of the box. A prompt with an attachment opens straight into
+  the multi-line box so the chip has room, then types underneath it. Per demo via
+  `ATTACHMENT_BY_DEMO` in `page.tsx`; only the weekend has one.
+- **Mic:** gone as soon as typing starts, in both the one-line and multi-line layouts.
+- **Spacing (every demo — it's the one shared bar):** wider side inset, looser line height
+  (2.2cqw), more space above the toolbar, and Send stays full size (4.4cqw) in the multi-line
+  box instead of shrinking.
+- Not yet updated: the weekend answer itself still describes the old friends' weekend.
+
+### 2026-09-24 — Weekend answer rewritten for the NYC prompt
+Reference: `~/Downloads/Screenshot 2026-09-24 at 9.53.48 PM.png`, `…9.53.55 PM.png`.
+- **Loading:** "Connecting to Workspace…" with a logo, in place of the generic cycling
+  captions — any text answer can now name its app via `ResponseContent.loading`. Workspace is
+  marked with the Google Drive icon.
+- **Answer** (`WEEKEND_RESPONSE`), copy from the screenshots: intro paragraph → Activity
+  Strategy (Handling the 8:00 AM vs. 11:30 AM Split), four bullets → Weekend Packing List, four
+  bullets. Regular-weight headings, as in the band tour. The old arrivals/itinerary content and
+  closing paragraph are gone; the response footer stays.
+- **Ask Gemini bar:** parks as the answer lands and doesn't come back, matching go out and the
+  band tour — an answer that scrolls now has the whole frame. The three share one list,
+  `ANSWER_DEMOS` in `page.tsx`.
+
+### 2026-09-24 — New flow: Prep for the big meeting (traveler)
+Reference: `~/Downloads/Screenshot 2026-09-24 at 10.01.44 PM.png` (rail), `…10.03.55 PM.png`
+and `…10.04.01 PM.png` (doc).
+- **Prompt:** "Prepare a briefing doc for my meeting with Syntherva Systems next week. Include
+  past meeting notes, suggested discussion topics, and every day add the latest financial news
+  at 6am."
+- **Act one:** the same reasoning rail the semester plan uses — Gmail, Drive, Calendar, Docs,
+  then "Task complete" — with a Google Docs file chip ("Briefing: Syntherva Systems", Open)
+  between the card and a "Review the Google Doc" button.
+- **Act two:** the doc itself, laid out as a document rather than a chat answer: title,
+  the grey "who / when / refreshes daily" line, then Past meeting notes, Suggested discussion
+  topics, Financial news 6:00 AM today, and Kept fresh. It writes itself block by block (same
+  stagger as a text answer) and scrolls, with the rising-dots cue.
+- **Shared:** the rail is now `ThinkingRail.tsx` — card, steps, feedback row, CTA, and an
+  optional file chip — used by both this flow and the semester plan, which is otherwise
+  unchanged. `ThinkingStep`'s app union gained `gmail` and `docs`.
+- **Ask Gemini bar:** parked for the whole answer, like the semester plan.
+- The pill "Prep for the big meeting" is now live on the traveler menu.
+
+### 2026-09-24 — New flow: Make a dinner reservation (traveler)
+Reference: `~/Downloads/Screenshot 2026-09-24 at 10.11.24/10.11.34/10.11.42/10.13.19/10.17.07/10.15.22 PM.png`.
+- **Prompt:** "I'm looking for a reservation in Little Havana next Saturday night for 5 people.
+  Somewhere fun with local Cuban food and live music."
+- **Results:** a grounded-search answer — the "25 sites" header with the three providers'
+  coins stacked — then Sazón Cubano 305 (Resy), Ocho Siete Bistro (Tock), Coco Sabroso and
+  Rumba Tarde (OpenTable). Each has its card (stars, review count, `$$ · Cuban`, Open ·
+  address), its paragraph, and its own six bookable times, three across, each marked with its
+  provider's coin. Copy and times are from the screenshots.
+- **Booking sheet:** every time is live, and the sheet it opens carries that provider's name
+  and mark, that restaurant's card and that time — so all 24 slots reach the right
+  confirmation. Date & Time, Party Size, Guest information and Seating preference are display
+  rows; Confirm reservation is the one live control, and it turns into a green
+  "✓ Reservation confirmed".
+- **Ending:** the confirmation holds ~1.8s, then the answer and sheet crossfade out and the
+  Google widget setup screen takes the frame — step 1's four cards in a row, steps 2 and 3
+  side by side, inside the design's rainbow rim. It carries its own QR, so `page.tsx` drops
+  the corner QR prompt for this demo; "Back to your rundown" still appears.
+- **Assets:** `aim/` (the four restaurant photos, and the Resy/Tock/OpenTable coins) and
+  `gwidget/` (the four setup shots and the "chocolate" search), all already in the asset set.
+- **Ask Gemini bar:** parks as the results land, like the other answer demos.
+
+### 2026-09-24 — Dinner flow fixes: prompt bubble, the bento, and stuck tap targets
+- **Prompt bubble + thinking beat:** the flow went from Send straight to results with nothing
+  in between. It now shows the prompt in its own bubble (carried over from the compose bar,
+  like every other answer) with the thinking indicator under it, so the bar handing off no
+  longer reads as the prompt vanishing.
+- **Widget bento:** capped at 74cqw and stepped down a size. The step-1 shots now take their
+  column's full width at their own aspect, so all four are one size and each image's left edge
+  squares with its caption — `object-contain` had been letterboxing each one differently.
+  Steps 2 and 3 size their images off the row's leftover height, so the pair match.
+- **Everything unclickable after the flow (bug):** `pointer-events: auto` re-enables
+  hit-testing even inside an ancestor that set `none`, so a finished response — which page.tsx
+  keeps mounted and faded — went on catching taps meant for the screen after it. Fixed by
+  never forcing `auto` where the ancestor already grants it:
+  - the dinner answer inherits instead, its buttons are gated on `active`, and the answer
+    unmounts once the widget screen has taken over;
+  - `GradientPillButton` and the study notebook's controls dropped `pointer-events-auto`
+    (they sit inside the response layer, which already grants it);
+  - the compose bar's Send — which genuinely has to opt back in through the bar's own
+    `none` — is now gated on `showChat`, so an invisible Send stops catching taps on the
+    rundown.
+  Verified by driving all four interactive flows to the end, leaving, and using the menu.
+
+### 2026-09-24 — New screen: Explore a new city (traveler)
+Reference: `~/Downloads/cityMenu/` (five screenshots, 2026-09-24 10.18 PM).
+- A choice screen between the traveler's "Explore a new city" pill and a city's own flow,
+  built on the same language as the friday-night fork: the shared wash, the same glass pills
+  at the same size, the heading centred at the menu's display size (the portrait reference
+  ranges it left; landscape centres it, as the other choice screens do), and the FPO chip.
+- **Rotating backdrop:** all five city photos are mounted and cross-faded by opacity — 4.2s
+  hold, 1.4s fade — so the screen asking *which* city doesn't answer itself by showing one.
+  Mounting them all also preloads them, so no fade lands on a photo that hasn't arrived.
+- **Cities:** Austin, Chicago, Los Angeles, New York, Seattle, on `pick/city-*.jpg` from the
+  asset set.
+- **Not yet wired:** no city flow exists, so picking one holds the screen. `handleCitySelect`
+  in `page.tsx` is the seam the first city flow plugs into.
+
+### 2026-09-24 — Explore a new city: a day plan per city
+Reference: `~/Downloads/cityContent/{austin,chicago,los angeles,new york,seattle}/`.
+- **Prompt:** "I've got a full day to explore <city>. Knowing my interests, what should I check
+  out?" — typed into the Ask Gemini bar, with the city's name in it, so the compose bar and the
+  prompt bubble both name the city that was picked.
+- **Answers** (`CITY_GUIDES` in `types.ts`): all five are ordinary `ResponseContent`, rendered
+  by the same ScrollPattern the band tour and weekend use — a Maps still pinning the four
+  venues, the intro, then five stops, each a "Stop N · Name" heading (regular weight), a place
+  card (photo, name, rating + star, `Open · hours`) and a line. Copy is from the screenshots.
+- **Wiring:** one `city` demo id carries all five; `cityId` says which guide to read, so the
+  prompt and the answer both come from it. The Ask Gemini bar parks when the answer lands,
+  like the other answer demos.
+- **Maps:** `map-city-austin/chicago/nyc/seattle.jpg` and `map-venue-la.jpg`. Pin x-positions
+  are measured off the reference; the y-positions are laddered evenly instead, because our
+  map stills are wider than the design's crop and the measured spacing bunched the name chips
+  into each other.
+- **Photos are stand-ins**, as they are in the reference itself (its Griffith Park card is a
+  photo of a laptop): each stop takes the nearest room or skyline in the asset set, and the FPO
+  chip says so. `wk-city-nashville.jpg` is avoided — it has white letterbox bars baked in,
+  which is why the reference's Austin card has them too.

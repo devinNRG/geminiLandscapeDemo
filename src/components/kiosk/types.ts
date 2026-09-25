@@ -77,6 +77,9 @@ export type ResponseContent = {
   sections: Section[];
   /** Optional wrap-up after the last section. */
   closingLines?: string[];
+  /** The loading beat, when it should name the app Gemini is reaching into (with its logo)
+   * rather than cycling the generic "Thinking…" captions. */
+  loading?: { caption: string; icon: string };
 };
 
 /** A Google Maps still with pins (and optionally a route) drawn over it. Pins and route
@@ -103,63 +106,58 @@ export type MapPin = {
 
 export const WEEKEND_RESPONSE: ResponseContent = {
   promptLines: [
-    "Sort the friends weekend. Everyone",
-    "lands at a different time: build the",
-    "weekend around the arrivals, match",
+    "Help us plan our weekend trip to NYC. Suggest some things to do based on our preferences in the attached Google Sheet. Make a packing list.",
   ],
+  // the answer is built from the attached Sheet, so the loading beat names Workspace, marked
+  // with the Drive icon
+  loading: { caption: "Connecting to Workspace\u2026", icon: "/v81-image-assets-inuse/assets/products/drive.svg" },
   introLines: [
-    "Here is the weekend built around the five arrivals,",
-    "with the food and activity preferences from the",
-    "sheet. Pack light: the house has towels, a washer",
-    "and beach gear.",
+    "Balancing an early-rising deli lover, an indie/vegan explorer, and a night-owl luxury seeker takes thoughtful geographic clustering and flexible morning schedules.",
   ],
+  plainHeadings: true,
   sections: [
     {
-      id: "arrivals",
-      heading: "Arrivals, Friday at LAX",
-      bulleted: true,
-      items: [
-        ["Jonas · UA 512 from San Francisco, landed", "2.10"],
-        ["Nadia · DL 1187 from Atlanta, lands 5.25 after", "a 40 minute delay"],
-        ["Rafael · AA 2210 from New York, lands 9.15"],
+      id: "activity-strategy",
+      heading: "Activity Strategy (Handling the 8:00 AM vs. 11:30 AM Split)",
+      bullets: [
+        {
+          label: "Staggered Mornings:",
+          text: "Alex and Maya kick off the day together. Alex grabs early morning bagels (8:00 AM), meeting Maya at 10:00 AM to walk the High Line or Brooklyn Bridge.",
+        },
+        {
+          label: "Midday Regroup (11:30 AM \u2013 4:00 PM):",
+          text: "Meet Jordan in Midtown for lunch, and an afternoon visit to a museum or a Saturday Broadway matinee.",
+        },
+        {
+          label: "Neighborhood Clustering to Manage Walking:",
+          text: "Keep Jordan\u2019s low walking tolerance happy by grouping activities geographically and taking quick 10-minute yellow cabs/subways between hubs (Midtown to Bushwick/SoHo), letting Alex and Maya rack up their 15,000+ steps exploring within each neighborhood.",
+        },
+        {
+          label: "Bucket-List Compromise:",
+          text: "Prioritize a hit Broadway evening show together, spend Sunday morning thrifting around Bushwick/Williamsburg, and catch a daytime Yankees game if travel dates coincide.",
+        },
       ],
     },
     {
-      id: "preferences",
-      heading: "From the preferences sheet",
-      bulleted: true,
-      items: [
-        ["Nadia · vegetarian"],
-        ["Rafael · late arrival, no early starts"],
-        ["Jonas · a hike on Saturday"],
-        ["Everyone · one dinner together"],
-      ],
-    },
-    {
-      id: "weekend",
-      heading: "The weekend",
-      bulleted: false,
-      items: [
-        ["Friday · Jonas lands 2.10, Nadia 5.25 after", "the delay, Rafael 9.15"],
-        ["Friday · Dinner for four at 6.30, ramen with", "Rafael at 9.45"],
-        ["Saturday · Morning hike at Runyon Canyon,", "afternoon free"],
-        ["Saturday · Table for five at 8, everyone", "together"],
-        ["Sunday · Late breakfast before the first flight", "out at 1.15"],
-      ],
-    },
-    {
-      // the prompt ends "...and put together a packing list", so the answer has to actually
-      // produce one — single-line items, straight from the design file
       id: "packing",
-      heading: "Packing list",
-      bulleted: true,
-      items: [
-        ["Swimsuits"],
-        ["Trail shoes"],
-        ["One smart shirt"],
-        ["Sunscreen"],
-        ["Refillable water bottle"],
-        ["Light jacket for the evenings"],
+      heading: "Weekend Packing List",
+      bullets: [
+        {
+          label: "Footwear:",
+          text: "Broken-in walking sneakers (essential for Alex and Maya\u2019s 15k\u201320k steps) plus one upscale pair of shoes/loafers meeting evening rooftop and Broadway dress codes.",
+        },
+        {
+          label: "Clothing & Layers:",
+          text: "Smart-casual daytime outfits, a warm light layer for breezy observation decks and overly air-conditioned theaters, and one elevated dinner/nightlife outfit.",
+        },
+        {
+          label: "Tech & Gear:",
+          text: "High-capacity portable phone charger (indispensable for full days navigating transit, digital tickets, and photos), compact travel umbrella, and a crossbody daypack.",
+        },
+        {
+          label: "Group Harmony Essentials:",
+          text: "Eye mask and earplugs (crucial when roommates are waking up at 8:00 AM while others sleep until 11:30 AM), and contactless payment set up on phones for seamless subway taps.",
+        },
       ],
     },
   ],
@@ -289,7 +287,7 @@ export const BAND_TOUR_RESPONSE: ResponseContent = {
  * row ends it. */
 export type ThinkingStep =
   | { kind: "thought"; text: string }
-  | { kind: "app"; app: "drive" | "calendar"; text: string }
+  | { kind: "app"; app: "drive" | "calendar" | "gmail" | "docs"; text: string }
   | { kind: "done"; text: string };
 
 /**
@@ -765,6 +763,682 @@ export const STUDY_NOTEBOOK: StudyNotebookContent = {
   disclaimer: "Gemini Notebook can be inaccurate; please double check its responses.",
 };
 
+/**
+ * "Prep for the big meeting" — the traveler's agentic flow, and the second answer built on
+ * the shared reasoning rail. Where the semester plan ends inside Google Calendar, this one
+ * ends inside a Google Doc: Gemini reads the past threads, pulls the news, and writes a
+ * briefing the visitor then reads. Rendered by `MeetingBriefResponse.tsx`.
+ */
+export type DocSection = {
+  heading: string;
+  bullets: string[];
+};
+
+export type MeetingBriefContent = {
+  promptLines: string[];
+  steps: ThinkingStep[];
+  /** The chip the rail produces, between the card and the CTA. */
+  file: { title: string; app: string; action: string };
+  ctaLabel: string;
+  doc: {
+    title: string;
+    /** The grey line under the title — who, when, and how often it refreshes. */
+    subtitle: string;
+    sections: DocSection[];
+  };
+};
+
+export const MEETING_BRIEF: MeetingBriefContent = {
+  promptLines: [
+    "Prepare a briefing doc for my meeting with Syntherva Systems next week. Include past meeting notes, suggested discussion topics, and every day add the latest financial news at 6am.",
+  ],
+  steps: [
+    { kind: "app", app: "gmail", text: "Gmail" },
+    { kind: "thought", text: "Reading the notes and email threads from the last two meetings." },
+    { kind: "app", app: "drive", text: "Google Drive" },
+    { kind: "thought", text: "Pulling the latest financial news and setting the 6:00 AM daily refresh." },
+    { kind: "app", app: "calendar", text: "Google Calendar" },
+    { kind: "thought", text: "Writing the suggested discussion topics into the doc." },
+    { kind: "app", app: "docs", text: "Google Docs" },
+    { kind: "thought", text: "Building the briefing doc." },
+    { kind: "done", text: "Task complete" },
+  ],
+  file: { title: "Briefing: Syntherva Systems", app: "Google Docs", action: "Open" },
+  ctaLabel: "Review the Google Doc",
+  doc: {
+    title: "Briefing: Syntherva Systems",
+    subtitle: "Syntherva Systems \u00b7 Meeting next week \u00b7 refreshed daily at 6:00 AM",
+    sections: [
+      {
+        heading: "Past meeting notes",
+        bullets: [
+          "12 August: Syntherva asked for a pilot scoped to two of their plants; the open question was data residency.",
+          "3 September: their operations lead confirmed the pilot budget and wants a decision before the quarter closes.",
+          "Carried over: the integration timeline they asked for has not been sent.",
+        ],
+      },
+      {
+        heading: "Suggested discussion topics",
+        bullets: [
+          "Pilot scope: two plants first, or all four at once.",
+          "Data residency: where their plant data is stored and who holds the keys.",
+          "Commercials: the per-plant licence against a company-wide rate.",
+          "Timeline: what a decision this month would let them ship by year end.",
+        ],
+      },
+      {
+        heading: "Financial news, 6:00 AM today",
+        bullets: [
+          "Syntherva reported second-quarter revenue up 14 percent on the year, led by the automation unit.",
+          "This morning Syntherva confirmed a third plant, extending its Midwest footprint.",
+          "Analysts named rising component costs as the main pressure on margins.",
+        ],
+      },
+      {
+        heading: "Kept fresh",
+        bullets: ["Gemini adds the latest financial news to this doc every day at 6:00 AM until the meeting."],
+      },
+    ],
+  },
+};
+
+/**
+ * "Make a dinner reservation" — the traveler's booking flow, and the one answer in the demo
+ * that transacts: a grounded search answer whose time slots are live, an in-app booking
+ * sheet from whichever provider holds that restaurant, and a confirmation that hands off to
+ * the Google widget setup screen. Rendered by `DinnerReservation.tsx`.
+ */
+export type BookingProvider = "resy" | "tock" | "opentable";
+
+export type DinnerPlace = {
+  id: string;
+  name: string;
+  rating: string;
+  /** Review count as drawn, e.g. "(18K)". */
+  reviews: string;
+  /** Price band and cuisine, e.g. "$$ · Cuban". */
+  meta: string;
+  address: string;
+  image: string;
+  /** The paragraph under the card. */
+  body: string;
+  /** Whose slots these are — the coin on every time button, and the sheet it opens. */
+  provider: BookingProvider;
+  /** Bookable times, in the order the design lists them. */
+  times: string[];
+};
+
+export type DinnerContent = {
+  promptLines: string[];
+  /** The grounded-search header above the answer: how many sites it read. */
+  sourceCount: string;
+  introText: string;
+  /** Grey line above each restaurant's time grid. */
+  availableLabel: string;
+  places: DinnerPlace[];
+  /** The rows of the booking sheet that are the same whichever slot is tapped. */
+  booking: {
+    dateLabel: string;
+    partySize: string;
+    guestInfo: string;
+    seating: string;
+    confirmLabel: string;
+    confirmedLabel: string;
+  };
+  /** The take-it-with-you screen the flow ends on, once a booking is confirmed. */
+  widget: {
+    title: string;
+    subtitle: string;
+    steps: { label: string; title: string }[];
+    /** The four cards inside step one. */
+    setup: { image: string; title: string; body: string }[];
+    search: { image: string; caption: string };
+    scan: { caption: string };
+  };
+};
+
+export const PROVIDER_LABEL: Record<BookingProvider, string> = {
+  resy: "Resy",
+  tock: "Tock",
+  opentable: "OpenTable",
+};
+
+export const PROVIDER_COIN: Record<BookingProvider, string> = {
+  resy: "/v81-image-assets-inuse/assets/aim/coin-resy.png",
+  tock: "/v81-image-assets-inuse/assets/aim/coin-tock.png",
+  opentable: "/v81-image-assets-inuse/assets/aim/coin-ot.png",
+};
+
+export const DINNER_RESERVATION: DinnerContent = {
+  promptLines: [
+    "I\u2019m looking for a reservation in Little Havana next Saturday night for 5 people. Somewhere fun with local Cuban food and live music.",
+  ],
+  sourceCount: "25 sites",
+  introText:
+    "Here are several options for a dinner reservation for 5 people in Little Havana on Saturday, May 23, 2026, with local Cuban food and live music.",
+  availableLabel: "Available on Saturday, May 23",
+  places: [
+    {
+      id: "sazon",
+      name: "Saz\u00f3n Cubano 305",
+      rating: "4.8",
+      reviews: "(18K)",
+      meta: "$$ \u00b7 Cuban",
+      address: "1499 SW 7th Ct",
+      image: "/v81-image-assets-inuse/assets/aim/sazon.jpg",
+      body: "This vibrant Cuban eatery specializes in traditional dishes and signature rum drinks. It is a popular spot with live Cuban music, especially on weekends.",
+      provider: "resy",
+      times: ["6:00 PM", "6:30 PM", "7:00 PM", "7:15 PM", "7:30 PM", "8:00 PM"],
+    },
+    {
+      id: "ocho",
+      name: "Ocho Siete Bistro",
+      rating: "4.7",
+      reviews: "(650)",
+      meta: "$$ \u00b7 Cuban",
+      address: "2205 SW 9th Terrace",
+      image: "/v81-image-assets-inuse/assets/aim/ocho.jpg",
+      body: "An elevated dining experience blending Cuban-Caribbean flavors with a modern aesthetic. It features professional live latin jazz music in a stylish environment.",
+      provider: "tock",
+      times: ["5:00 PM", "6:00 PM", "6:30 PM", "7:00 PM", "7:30 PM", "8:00 PM"],
+    },
+    {
+      id: "coco",
+      name: "Coco Sabroso",
+      rating: "4.9",
+      reviews: "(3.8K)",
+      meta: "$$ \u00b7 Cuban",
+      address: "330 SW 10th Way",
+      image: "/v81-image-assets-inuse/assets/aim/coco.jpg",
+      body: "This casual spot serves Cuban comfort food, including tapas. The environment is meant to make you feel like you are in Havana, featuring live music on the weekends.",
+      provider: "opentable",
+      times: ["6:00 PM", "6:15 PM", "6:30 PM", "7:00 PM", "7:45 PM", "8:30 PM"],
+    },
+    {
+      id: "rumba",
+      name: "Rumba Tarde",
+      rating: "4.8",
+      reviews: "(7.5K)",
+      meta: "$$ \u00b7 Cuban",
+      address: "1830 SW 11th Ave",
+      image: "/v81-image-assets-inuse/assets/aim/rumba.jpg",
+      body: "This popular spot is known for its world-class cocktails and nightly live music, fusing authentic Cuban charm with a fun atmosphere.",
+      provider: "opentable",
+      times: ["5:00 PM", "5:15 PM", "6:30 PM", "7:00 PM", "8:00 PM", "9:00 PM"],
+    },
+  ],
+  booking: {
+    dateLabel: "Saturday, May 23",
+    partySize: "5 Guests",
+    guestInfo: "Name, email and phone on file",
+    seating: "Main dining room",
+    confirmLabel: "Confirm reservation",
+    confirmedLabel: "Reservation confirmed",
+  },
+  widget: {
+    title: "Get the best of Google on your homescreen",
+    subtitle: "Set it up in just a few simple steps:",
+    steps: [
+      { label: "Step 1", title: "Add the widget to your home screen" },
+      { label: "Step 2", title: "Get it working" },
+      { label: "Step 3", title: "Scan to validate" },
+    ],
+    setup: [
+      {
+        image: "/v81-image-assets-inuse/assets/gwidget/step1.png",
+        title: "Sign in to Google:",
+        body: "Open the app and tap your account",
+      },
+      {
+        image: "/v81-image-assets-inuse/assets/gwidget/step2.png",
+        title: "Long press your home screen:",
+        body: "Hold until the icons jiggle",
+      },
+      {
+        image: "/v81-image-assets-inuse/assets/gwidget/step3.png",
+        title: "Tap \u201cEdit\u201d in top left corner:",
+        body: "Select \u201cAdd Widget\u201d",
+      },
+      {
+        image: "/v81-image-assets-inuse/assets/gwidget/step4.png",
+        title: "Choose Google and tap \u201cAdd\u201d:",
+        body: "Pick the Google app widget",
+      },
+    ],
+    search: { image: "/v81-image-assets-inuse/assets/gwidget/search.png", caption: "Search \u201cchocolate\u201d" },
+    scan: { caption: "Scan the QR code to validate" },
+  },
+};
+
+/**
+ * "Explore a new city" — the choice screen between the traveler's pill and a city's own
+ * flow. Its backdrop rotates through the five cities on offer, so the screen shows what it
+ * is asking about rather than picking one city's photo to stand for all of them.
+ */
+export type CityChoice = { id: string; label: string; image: string };
+
+export const CITY_CHOICES: CityChoice[] = [
+  { id: "austin", label: "Austin", image: "/v81-image-assets-inuse/assets/pick/city-aus.jpg" },
+  { id: "chicago", label: "Chicago", image: "/v81-image-assets-inuse/assets/pick/city-chi.jpg" },
+  { id: "los-angeles", label: "Los Angeles", image: "/v81-image-assets-inuse/assets/pick/city-la.jpg" },
+  { id: "new-york", label: "New York", image: "/v81-image-assets-inuse/assets/pick/city-ny.jpg" },
+  { id: "seattle", label: "Seattle", image: "/v81-image-assets-inuse/assets/pick/city-sea.jpg" },
+];
+
+/**
+ * "Explore a new city" — one day-plan per city, reached through `CityChoiceScreen`. Each is
+ * an ordinary text answer (`ResponseContent`, rendered by ScrollPattern like the band tour):
+ * a Maps still pinning the four venues, the intro, then five stops, each a heading, a place
+ * card and a line about it. Only the copy, the map and the photos differ per city, so they
+ * share one shape rather than one component each.
+ *
+ * The stop photography is stand-in, like the rest of the demo's: the asset set has rooms and
+ * skylines, not these particular shops, so each stop takes the closest one and the FPO chip
+ * says so.
+ */
+export const CITY_GUIDES: Record<string, ResponseContent> = {
+  "austin": {
+    promptLines: ["I\u2019ve got a full day to explore Austin. Knowing my interests, what should I check out?"],
+    map: {
+      image: "/v81-image-assets-inuse/assets/map-city-austin.jpg",
+      aspectRatio: 2.2222,
+      pinColor: "#F1BF42",
+      pins: [
+        { label: "East Side Books", x: 0.698, y: 0.13, side: "left" },
+        { label: "Rainey Street Table", x: 0.555, y: 0.34, side: "right" },
+        { label: "Lamar Records", x: 0.279, y: 0.55, side: "right" },
+        { label: "Congress Coffee Co", x: 0.475, y: 0.76, side: "right" },
+      ],
+    },
+    introLines: [
+      "Here is a Saturday in Austin built from your saved interests: coffee, record shops and a good bookshop, with somewhere for a late lunch. Every stop is a short ride or walk from the last.",
+    ],
+    plainHeadings: true,
+    sections: [
+      {
+        id: "stop-1",
+        heading: "Stop 1 \u00b7 Congress Coffee Co",
+        place: {
+          name: "Congress Coffee Co",
+          rating: "4.7",
+          status: "Open",
+          statusTail: "\u00b7 open until 6:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-nashville-2-int.jpg",
+        },
+        body: ["Flat white to start. A porch out front and breakfast tacos from the trailer next door."],
+      },
+      {
+        id: "stop-2",
+        heading: "Stop 2 \u00b7 Lamar Records",
+        place: {
+          name: "Lamar Records",
+          rating: "4.8",
+          status: "Open",
+          statusTail: "\u00b7 open until 8:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-nashville-3-int.jpg",
+        },
+        body: ["Crate digging: country, soul and local pressings, with a listening booth at the back."],
+      },
+      {
+        id: "stop-3",
+        heading: "Stop 3 \u00b7 East Side Books",
+        place: {
+          name: "East Side Books",
+          rating: "4.6",
+          status: "Open",
+          statusTail: "\u00b7 open until 7:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-sf-3-int.jpg",
+        },
+        body: ["Independent bookshop with a shaded yard next door for reading out of the heat."],
+      },
+      {
+        id: "stop-4",
+        heading: "Stop 4 \u00b7 Rainey Street Table",
+        place: {
+          name: "Rainey Street Table",
+          rating: "4.5",
+          status: "Open",
+          statusTail: "\u00b7 Lunch until 3:30 PM",
+          image: "/v81-image-assets-inuse/assets/wk-nashville-1-ext.jpg",
+        },
+        body: ["Late lunch: smoked plates and a shaded patio a short walk from the bookshop."],
+      },
+      {
+        id: "stop-5",
+        heading: "Stop 5 \u00b7 Lady Bird Lake",
+        place: {
+          name: "Lady Bird Lake trail",
+          rating: "4.9",
+          status: "Open",
+          statusTail: "\u00b7 open until sunset",
+          image: "/v81-image-assets-inuse/assets/tour-austin.jpg",
+        },
+        body: ["The boardwalk loop by the water, back before the light goes."],
+      },
+    ],
+  },
+  "chicago": {
+    promptLines: ["I\u2019ve got a full day to explore Chicago. Knowing my interests, what should I check out?"],
+    map: {
+      image: "/v81-image-assets-inuse/assets/map-city-chicago.jpg",
+      aspectRatio: 2.2222,
+      pinColor: "#F1BF42",
+      pins: [
+        { label: "Logan Vinyl", x: 0.372, y: 0.13, side: "right" },
+        { label: "Armitage Books", x: 0.632, y: 0.34, side: "left" },
+        { label: "Damen Roasters", x: 0.505, y: 0.55, side: "right" },
+        { label: "Randolph Kitchen", x: 0.591, y: 0.76, side: "right" },
+      ],
+    },
+    introLines: [
+      "Here is a Saturday in Chicago built from your saved interests: coffee, record shops and a good bookshop, with somewhere for a late lunch. Every stop is a short ride or walk from the last.",
+    ],
+    plainHeadings: true,
+    sections: [
+      {
+        id: "stop-1",
+        heading: "Stop 1 \u00b7 Damen Roasters",
+        place: {
+          name: "Damen Roasters",
+          rating: "4.7",
+          status: "Open",
+          statusTail: "\u00b7 open until 6:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-chicago-1-int.jpg",
+        },
+        body: ["Flat white to start. Roasted on site, a long bench by the window."],
+      },
+      {
+        id: "stop-2",
+        heading: "Stop 2 \u00b7 Logan Vinyl",
+        place: {
+          name: "Logan Vinyl",
+          rating: "4.8",
+          status: "Open",
+          statusTail: "\u00b7 open until 8:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-chicago-2-int.jpg",
+        },
+        body: ["Crate digging: house and soul reissues, with a listening booth at the back."],
+      },
+      {
+        id: "stop-3",
+        heading: "Stop 3 \u00b7 Armitage Books",
+        place: {
+          name: "Armitage Books",
+          rating: "4.6",
+          status: "Open",
+          statusTail: "\u00b7 open until 7:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-chicago-3-int.jpg",
+        },
+        body: ["Independent bookshop with a reading room upstairs and a cat asleep on the counter."],
+      },
+      {
+        id: "stop-4",
+        heading: "Stop 4 \u00b7 Randolph Kitchen",
+        place: {
+          name: "Randolph Kitchen",
+          rating: "4.5",
+          status: "Open",
+          statusTail: "\u00b7 Lunch until 3:30 PM",
+          image: "/v81-image-assets-inuse/assets/wk-chicago-1-ext.jpg",
+        },
+        body: ["Late lunch: wood-fired plates on Restaurant Row, a short ride from the bookshop."],
+      },
+      {
+        id: "stop-5",
+        heading: "Stop 5 \u00b7 Lakefront Trail",
+        place: {
+          name: "Lakefront Trail walk",
+          rating: "4.9",
+          status: "Open",
+          statusTail: "\u00b7 open until sunset",
+          image: "/v81-image-assets-inuse/assets/wk-city-chicago.jpg",
+        },
+        body: ["The easy stretch south along the water with the skyline ahead, back before the light goes."],
+      },
+    ],
+  },
+  "los-angeles": {
+    promptLines: ["I\u2019ve got a full day to explore Los Angeles. Knowing my interests, what should I check out?"],
+    map: {
+      image: "/v81-image-assets-inuse/assets/map-venue-la.jpg",
+      aspectRatio: 1.5652,
+      pinColor: "#F1BF42",
+      pins: [
+        { label: "Sideline Records", x: 0.491, y: 0.13, side: "right" },
+        { label: "Casa Lumen", x: 0.893, y: 0.34, side: "left" },
+        { label: "Halftone Coffee", x: 0.208, y: 0.55, side: "right" },
+        { label: "Vellum Books", x: 0.656, y: 0.76, side: "left" },
+      ],
+    },
+    introLines: [
+      "Here is a Saturday in Los Angeles built from your saved interests: coffee, record shops and a good bookshop, with somewhere for a late lunch. Every stop is a short walk from the last.",
+    ],
+    plainHeadings: true,
+    sections: [
+      {
+        id: "stop-1",
+        heading: "Stop 1 \u00b7 Halftone Coffee",
+        place: {
+          name: "Halftone Coffee",
+          rating: "4.7",
+          status: "Open",
+          statusTail: "\u00b7 open until 6:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-nyc-1-int.jpg",
+        },
+        body: ["Flat white to start. A small counter, pastries from the bakery next door."],
+      },
+      {
+        id: "stop-2",
+        heading: "Stop 2 \u00b7 Sideline Records",
+        place: {
+          name: "Sideline Records",
+          rating: "4.8",
+          status: "Open",
+          statusTail: "\u00b7 open until 8:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-sf-2-int.jpg",
+        },
+        body: ["Crate digging: soul and jazz reissues, with a listening booth at the back."],
+      },
+      {
+        id: "stop-3",
+        heading: "Stop 3 \u00b7 Vellum Books",
+        place: {
+          name: "Vellum Books",
+          rating: "4.6",
+          status: "Open",
+          statusTail: "\u00b7 open until 7:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-nola-2-int.jpg",
+        },
+        body: ["Independent bookshop with a courtyard next door for reading in the sun."],
+      },
+      {
+        id: "stop-4",
+        heading: "Stop 4 \u00b7 Casa Lumen",
+        place: {
+          name: "Casa Lumen",
+          rating: "4.5",
+          status: "Open",
+          statusTail: "\u00b7 Lunch until 3:30 PM",
+          image: "/v81-image-assets-inuse/assets/wk-miami-2-int.jpg",
+        },
+        body: ["Late lunch: wood-fired plates and a shaded patio a short walk from the bookshop."],
+      },
+      {
+        id: "stop-5",
+        heading: "Stop 5 \u00b7 Griffith Park",
+        place: {
+          name: "Griffith Park walk",
+          rating: "4.9",
+          status: "Open",
+          statusTail: "\u00b7 open until sunset",
+          image: "/v81-image-assets-inuse/assets/pick/city-la.jpg",
+        },
+        body: ["The easy loop from the observatory, back before the light goes."],
+      },
+    ],
+  },
+  "new-york": {
+    promptLines: ["I\u2019ve got a full day to explore New York. Knowing my interests, what should I check out?"],
+    map: {
+      image: "/v81-image-assets-inuse/assets/map-city-nyc.jpg",
+      aspectRatio: 2.2222,
+      pinColor: "#F1BF42",
+      pins: [
+        { label: "Tin Cup Coffee", x: 0.384, y: 0.13, side: "right" },
+        { label: "Mercer Street Books", x: 0.307, y: 0.34, side: "right" },
+        { label: "Bleecker Vinyl", x: 0.697, y: 0.55, side: "left" },
+        { label: "Osteria Nolita", x: 0.542, y: 0.76, side: "right" },
+      ],
+    },
+    introLines: [
+      "Here is a Saturday in New York built from your saved interests: coffee, record shops and a good bookshop, with somewhere for a late lunch. Every stop is a short walk from the last.",
+    ],
+    plainHeadings: true,
+    sections: [
+      {
+        id: "stop-1",
+        heading: "Stop 1 \u00b7 Tin Cup Coffee",
+        place: {
+          name: "Tin Cup Coffee",
+          rating: "4.7",
+          status: "Open",
+          statusTail: "\u00b7 open until 6:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-nyc-2-int.jpg",
+        },
+        body: ["Flat white to start. A narrow counter, pastries from the bakery two doors down."],
+      },
+      {
+        id: "stop-2",
+        heading: "Stop 2 \u00b7 Bleecker Vinyl",
+        place: {
+          name: "Bleecker Vinyl",
+          rating: "4.8",
+          status: "Open",
+          statusTail: "\u00b7 open until 8:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-nashville-3-int.jpg",
+        },
+        body: ["Crate digging: soul and jazz reissues, with a listening booth at the back."],
+      },
+      {
+        id: "stop-3",
+        heading: "Stop 3 \u00b7 Mercer Street Books",
+        place: {
+          name: "Mercer Street Books",
+          rating: "4.6",
+          status: "Open",
+          statusTail: "\u00b7 open until 7:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-nyc-3-int.jpg",
+        },
+        body: ["Independent bookshop, new and used, with a reading bench by the window."],
+      },
+      {
+        id: "stop-4",
+        heading: "Stop 4 \u00b7 Osteria Nolita",
+        place: {
+          name: "Osteria Nolita",
+          rating: "4.5",
+          status: "Open",
+          statusTail: "\u00b7 Lunch until 3:30 PM",
+          image: "/v81-image-assets-inuse/assets/wk-nyc-1-ext.jpg",
+        },
+        body: ["Late lunch: handmade pasta and a few pavement tables a short walk from the bookshop."],
+      },
+      {
+        id: "stop-5",
+        heading: "Stop 5 \u00b7 The High Line",
+        place: {
+          name: "The High Line walk",
+          rating: "4.8",
+          status: "Open",
+          statusTail: "\u00b7 open until sunset",
+          image: "/v81-image-assets-inuse/assets/wk-city-nyc.jpg",
+        },
+        body: ["The elevated park end to end, back down at Hudson Yards before the light goes."],
+      },
+    ],
+  },
+  "seattle": {
+    promptLines: ["I\u2019ve got a full day to explore Seattle. Knowing my interests, what should I check out?"],
+    map: {
+      image: "/v81-image-assets-inuse/assets/map-city-seattle.jpg",
+      aspectRatio: 2.2222,
+      pinColor: "#F1BF42",
+      pins: [
+        { label: "Pine Street Coffee", x: 0.582, y: 0.13, side: "right" },
+        { label: "Pike Vinyl", x: 0.598, y: 0.34, side: "right" },
+        { label: "Market Kitchen", x: 0.39, y: 0.55, side: "right" },
+        { label: "Pioneer Books", x: 0.476, y: 0.76, side: "right" },
+      ],
+    },
+    introLines: [
+      "Here is a Saturday in Seattle built from your saved interests: coffee, record shops and a good bookshop, with somewhere for a late lunch. Every stop is a short walk from the last.",
+    ],
+    plainHeadings: true,
+    sections: [
+      {
+        id: "stop-1",
+        heading: "Stop 1 \u00b7 Pine Street Coffee",
+        place: {
+          name: "Pine Street Coffee",
+          rating: "4.7",
+          status: "Open",
+          statusTail: "\u00b7 open until 6:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-sf-1-int.jpg",
+        },
+        body: ["Flat white to start. A small counter, pastries from the bakery next door."],
+      },
+      {
+        id: "stop-2",
+        heading: "Stop 2 \u00b7 Pike Vinyl",
+        place: {
+          name: "Pike Vinyl",
+          rating: "4.8",
+          status: "Open",
+          statusTail: "\u00b7 open until 8:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-sf-2-int.jpg",
+        },
+        body: ["Crate digging: grunge-era pressings and jazz reissues, with a listening booth at the back."],
+      },
+      {
+        id: "stop-3",
+        heading: "Stop 3 \u00b7 Pioneer Books",
+        place: {
+          name: "Pioneer Books",
+          rating: "4.6",
+          status: "Open",
+          statusTail: "\u00b7 open until 7:00 PM",
+          image: "/v81-image-assets-inuse/assets/wk-sf-3-int.jpg",
+        },
+        body: ["Independent bookshop in a brick storefront with a reading nook at the back."],
+      },
+      {
+        id: "stop-4",
+        heading: "Stop 4 \u00b7 Market Kitchen",
+        place: {
+          name: "Market Kitchen",
+          rating: "4.5",
+          status: "Open",
+          statusTail: "\u00b7 Lunch until 3:30 PM",
+          image: "/v81-image-assets-inuse/assets/wk-sf-1-ext.jpg",
+        },
+        body: ["Late lunch: chowder and the day\u2019s catch, a short walk from the bookshop."],
+      },
+      {
+        id: "stop-5",
+        heading: "Stop 5 \u00b7 Olympic Sculpture Park",
+        place: {
+          name: "Olympic Sculpture Park walk",
+          rating: "4.8",
+          status: "Open",
+          statusTail: "\u00b7 open until sunset",
+          image: "/v81-image-assets-inuse/assets/wk-city-sf.jpg",
+        },
+        body: ["Down to the water along the sculptures, back before the light goes."],
+      },
+    ],
+  },
+};
+
 export type Persona = {
   id: string;
   /** Who they are, as the landing pill's first line — a role, not an age ("Student", not "The student, 20"). */
@@ -854,10 +1528,10 @@ export const RUNDOWNS: Record<string, RundownData> = {
     // the dark meadow under the pill stack — nothing to pan for.
     bgImage: "/v81-image-assets-inuse/assets/pick/sunrise-meadow.jpg",
     pills: [
-      { id: "friends-weekend", label: "Sort the friend’s weekend", active: true },
-      { id: "partnerships-vp", label: "Brief me on the partnerships VP" },
-      { id: "saturday-dinner", label: "Book Saturday dinner" },
-      { id: "new-city", label: "Explore a new city" },
+      { id: "friends-weekend", label: "Plan a weekend getaway", active: true },
+      { id: "partnerships-vp", label: "Prep for the big meeting", active: true },
+      { id: "saturday-dinner", label: "Make a dinner reservation", active: true },
+      { id: "new-city", label: "Explore a new city", active: true },
     ],
   },
   parent: {

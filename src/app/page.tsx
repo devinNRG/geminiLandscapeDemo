@@ -7,7 +7,10 @@ import {
   FRIDAY_NIGHT_TASK,
   GO_OUT_MESSAGES,
   GO_OUT_SEARCH,
+  DINNER_RESERVATION,
+  CITY_GUIDES,
   GO_OUT_SUGGESTION,
+  MEETING_BRIEF,
   PERSONAS,
   RUNDOWNS,
   SEMESTER_PLAN,
@@ -23,19 +26,22 @@ import {
 } from "@/components/kiosk/types";
 import TypingLines from "@/components/kiosk/TypingLines";
 import RundownScreen from "@/components/kiosk/RundownScreen";
+import CityChoiceScreen from "@/components/kiosk/CityChoiceScreen";
 import FridayNightChoiceScreen from "@/components/kiosk/FridayNightChoiceScreen";
 import TaskAutomationResponse from "@/components/kiosk/TaskAutomationResponse";
 import GoOutResponse, { GO_OUT_CUE_DELAY_MS } from "@/components/kiosk/GoOutResponse";
 import MessagesScene from "@/components/kiosk/MessagesScene";
+import DinnerReservation from "@/components/kiosk/DinnerReservation";
+import MeetingBriefResponse from "@/components/kiosk/MeetingBriefResponse";
 import SemesterPlanResponse from "@/components/kiosk/SemesterPlanResponse";
 import StudyNotebook from "@/components/kiosk/StudyNotebook";
 import ScrollPattern from "@/components/kiosk/patterns/ScrollPattern";
 import { BackButton, GradientPillButton, PulseRings, useThinkingPhase } from "@/components/kiosk/shared";
 
-type Stage = "landing" | "rundown" | "fridayNightChoice" | "idle" | "typed" | "response";
+type Stage = "landing" | "rundown" | "fridayNightChoice" | "cityChoice" | "idle" | "typed" | "response";
 
 // which built demo the compose bar / response area are currently playing
-type DemoId = "weekend" | "fridayNight" | "goOut" | "bandTour" | "semester" | "notebook";
+type DemoId = "weekend" | "fridayNight" | "goOut" | "bandTour" | "semester" | "notebook" | "meeting" | "dinner" | "city";
 
 // pill id -> the demo it plays; every other pill renders disabled on the rundown screen
 const PILL_DEMOS: Record<string, DemoId> = {
@@ -43,6 +49,8 @@ const PILL_DEMOS: Record<string, DemoId> = {
   "band-tour": "bandTour",
   "study-semester": "semester",
   "study-notebook": "notebook",
+  "partnerships-vp": "meeting",
+  "saturday-dinner": "dinner",
   // "friday-night" is deliberately absent — it routes through the fridayNightChoice
   // screen instead, which sets activeDemo to "fridayNight" or "goOut" itself
 };
@@ -70,19 +78,28 @@ const SUGGESTION_BY_DEMO: Partial<Record<DemoId, MessagesSuggestion>> = {
 const DEFAULT_RUNDOWN_PERSONA = PERSONAS.find((p) => p.id === "traveler")!;
 
 const PROMPT_LINES_BY_DEMO: Record<DemoId, string[]> = {
-  weekend: [
-    "Sort the friends weekend. Everyone lands at a",
-    "different time: build the weekend around the",
-    "arrivals, match the plan to the preferences",
-    "sheet everyone filled in, and put together a",
-    "packing list.",
-  ],
+  weekend: WEEKEND_RESPONSE.promptLines,
   fridayNight: FRIDAY_NIGHT_TASK.promptLines,
   goOut: GO_OUT_SEARCH.promptLines,
   bandTour: BAND_TOUR_RESPONSE.promptLines,
   semester: SEMESTER_PLAN.promptLines,
   // typed into the notebook's own input, not the Ask Gemini bar (see StudyNotebook)
   notebook: [STUDY_NOTEBOOK.setupPrompt],
+  meeting: MEETING_BRIEF.promptLines,
+  dinner: DINNER_RESERVATION.promptLines,
+  // the city flow's prompt names the city, so it comes from the picked guide instead —
+  // see `promptLines` below. This entry is only the fallback before one is picked.
+  city: [],
+};
+
+// Demos whose answer takes the frame once it lands, so the compose bar parks for the rest of
+// the flow. (The semester demo parks from the moment its prompt is sent — see below.)
+const ANSWER_DEMOS: ReadonlySet<DemoId> = new Set<DemoId>(["goOut", "bandTour", "weekend", "dinner", "city"]);
+
+// A file attached to the prompt, shown as a chip at the top of the compose box.
+type ComposeAttachment = { name: string; icon: string };
+const ATTACHMENT_BY_DEMO: Partial<Record<DemoId, ComposeAttachment>> = {
+  weekend: { name: "NYC weekend preferences", icon: "/v81-image-assets-inuse/assets/products/sheets.png" },
 };
 
 // the expanded (multi-line) compose box's height must fit whatever text is currently visible,
@@ -102,16 +119,22 @@ const COMPOSE_BOTTOM_CQW = 53.27;
 // the text outgrew one line, which landed a sideways nudge in the middle of the height growth
 // and read as a second, competing animation.
 const COMPOSE_WIDTH_CQW = 35.43;
-// matches the typed text's own text-[1.4cqw] leading-[1.9cqw] classes
-const COMPOSE_LINE_HEIGHT_CQW = 1.9;
+// matches the typed text's own text-[1.4cqw] leading-[2.2cqw] classes
+const COMPOSE_LINE_HEIGHT_CQW = 2.2;
 // the multi-line layout's own padding/gap/toolbar — see the compose box's JSX below; kept as
 // named constants (rather than re-measuring) since they're values this file itself sets, not
-// values coming from unrelated content
-const MULTILINE_PT_CQW = 2.1;
-const MULTILINE_GAP_CQW = 0.6;
-const MULTILINE_TOOLBAR_ROW_CQW = 2.62; // matches the toolbar row's tallest icon, the Send button (h-[2.62cqw])
-const MULTILINE_PB_CQW = 1.3;
+// values coming from unrelated content. Spacing is the design's (Screenshot 2026-09-24 at
+// 9.45.25 PM): a roomier inset than the box first had, and Send at full size.
+const MULTILINE_PT_CQW = 2.2;
+const MULTILINE_GAP_CQW = 1.2;
+const MULTILINE_TOOLBAR_ROW_CQW = 4.4; // matches the toolbar row's tallest item, the Send button (h-[4.4cqw])
+const MULTILINE_PB_CQW = 1.9;
 const CHROME_CQW = MULTILINE_PT_CQW + MULTILINE_GAP_CQW + MULTILINE_TOOLBAR_ROW_CQW + MULTILINE_PB_CQW;
+// an attached file's chip rides above the prompt: its own height, and the gap below it. With
+// a chip the box's top inset tightens to the chip's own (ATTACHMENT_PT_CQW), as drawn.
+const ATTACHMENT_CHIP_CQW = 4.1;
+const ATTACHMENT_GAP_CQW = 1.2;
+const ATTACHMENT_PT_CQW = 1.5;
 // pause before any characters appear, once the compose box is in place
 const TYPING_START_DELAY_MS = 1500;
 // how long the box takes to slide up from below the frame — matches the compose bar's own
@@ -201,6 +224,13 @@ export default function Home() {
   const [chatVisibleInResponse, setChatVisibleInResponse] = useState(true);
   // the result picked in go out, appended to the thread as Gemini's drafted plan
   const [goOutPick, setGoOutPick] = useState<RestaurantResult | null>(null);
+  // The rundown pill that started the current flow, and the pills whose flows have been
+  // finished this visit. A visitor working through one persona's menu sees what they've
+  // done; going home to the persona picker is starting over, so it clears them.
+  const [activePill, setActivePill] = useState<string | null>(null);
+  // which city "Explore a new city" was answered for
+  const [cityId, setCityId] = useState<string | null>(null);
+  const [completedPills, setCompletedPills] = useState<ReadonlySet<string>>(() => new Set());
 
   const frameRef = useRef<HTMLDivElement>(null);
   const liveTextRef = useRef<HTMLDivElement>(null);
@@ -229,7 +259,8 @@ export default function Home() {
   const showLanding = stage === "landing";
   const showRundown = stage === "rundown";
   const showFridayNightChoice = stage === "fridayNightChoice";
-  const showChat = !showLanding && !showRundown && !showFridayNightChoice;
+  const showCityChoice = stage === "cityChoice";
+  const showChat = !showLanding && !showRundown && !showFridayNightChoice && !showCityChoice;
   const composeExpanded = stage === "typed";
   const showHero = stage === "idle";
   const showResponse = stage === "response";
@@ -278,7 +309,15 @@ export default function Home() {
     if (!composeExpanded) setTypingDone(false);
   }, [composeExpanded]);
 
-  const composeHeightCqw = multiLineLatched ? CHROME_CQW + liveTextHeightCqw : 7.33;
+  // A prompt with an attachment opens straight into the multi-line box the moment typing
+  // starts: the chip needs the room, and the prompt then types in underneath it.
+  const attachment = ATTACHMENT_BY_DEMO[activeDemo];
+  const multiLine = multiLineLatched || (!!attachment && hasStartedTyping);
+  const composeHeightCqw = multiLine
+    ? CHROME_CQW +
+      liveTextHeightCqw +
+      (attachment ? ATTACHMENT_CHIP_CQW + ATTACHMENT_GAP_CQW + ATTACHMENT_PT_CQW - MULTILINE_PT_CQW : 0)
+    : 7.33;
 
   // Both friday-night branches open on their own group chat instead of the generic hero,
   // and now stay on it through the response — Gemini's answer floats over the thread
@@ -286,6 +325,11 @@ export default function Home() {
   const showMessagesScene =
     (activeDemo === "fridayNight" || activeDemo === "goOut") &&
     (showHero || composeExpanded || (showResponse && chatVisibleInResponse));
+
+  // the city guides all share one demo id, so which one plays is the picked city's
+  const cityGuide = cityId ? CITY_GUIDES[cityId] : undefined;
+  const responseContent = activeDemo === "city" ? cityGuide : RESPONSE_CONTENT_BY_DEMO[activeDemo];
+  const promptLines = activeDemo === "city" && cityGuide ? cityGuide.promptLines : PROMPT_LINES_BY_DEMO[activeDemo];
 
   // go out's drafted plan, plus the group's answers, appended to the thread once a result
   // is picked. Memoised because AnimatedThread keys its in-flight timer off this array's
@@ -304,24 +348,23 @@ export default function Home() {
   // the rest of the flow. The RCS field is the wider of the two, so its ends stay visible
   // either side of Gemini's pill; that overlap is the source design's, not an accident.
   //
-  // The semester demo parks it for its whole answer rather than for a single beat: once the
-  // prompt is sent that flow is a reasoning rail and then a full-bleed Google Calendar, and
-  // the source design shows no compose bar for either. Leaving it up would also squeeze the
+  // The semester demo and the meeting brief park it for their whole answer rather than for a
+  // single beat: once the prompt is sent each is a reasoning rail and then a full-bleed Google
+  // app, and the source design shows no compose bar for any of it. Leaving it up would also squeeze the
   // rail, which needs the band the bar sits in to finish inside the frame.
   //
-  // Go out and the band tour park it too, once their results are up. In go out the only
-  // thing left to do is pick a restaurant, so the band belongs to the "tap on your chosen
-  // restaurant" prompt; the band tour's answer is the end of its flow. Nothing later in
-  // either asks Gemini anything, so the bar doesn't come back. Timed off the same thinking
-  // beat both answers reveal on, so the bar leaves as the results land.
-  const { contentShown: resultsUp } = useThinkingPhase(
-    showResponse && (activeDemo === "goOut" || activeDemo === "bandTour"),
-  );
+  // The answer demos park it as their content lands. In go out the only thing left to do is
+  // pick a restaurant, so the band belongs to the "tap on your chosen restaurant" prompt; the
+  // band tour's and the weekend's answers are the end of their flows. Nothing later in any of
+  // them asks Gemini anything, so the bar doesn't come back — and an answer that scrolls has
+  // the whole frame rather than running under a bar parked over its last two lines. Timed off
+  // the same thinking beat the answers reveal on, so the bar leaves as the content lands.
+  const { contentShown: resultsUp } = useThinkingPhase(showResponse && ANSWER_DEMOS.has(activeDemo));
   const goOutResultsUp = resultsUp && activeDemo === "goOut";
   // The study notebook parks it for the whole demo: the notebook has an input of its own.
   const composeParked =
     (showMessagesScene && showHero) ||
-    (showResponse && (activeDemo === "semester" || activeDemo === "notebook")) ||
+    (showResponse && (activeDemo === "semester" || activeDemo === "notebook" || activeDemo === "meeting")) ||
     resultsUp;
   // ...and the pick prompt comes last, a beat after the answer's scroll cue, so results,
   // cue and prompt each get their own moment instead of landing as one
@@ -352,11 +395,30 @@ export default function Home() {
     }
   };
 
+  const goHome = () => {
+    setCompletedPills(new Set());
+    setStage("landing");
+  };
+
+  // a flow counts as finished when the visitor takes its way out, which only appears once
+  // it has played through — and that way out leads back to the menu it was started from
+  const handleBackToRundown = () => {
+    if (activePill) setCompletedPills((done) => new Set(done).add(activePill));
+    setStage("rundown");
+  };
+
   const handlePillSelect = (pillId: string) => {
+    setActivePill(pillId);
     // Friday night now branches into two demos — route through the choice screen instead
     // of straight into the (only-built) stay-in flow
     if (pillId === "friday-night") {
       setStage("fridayNightChoice");
+      return;
+    }
+    // "Explore a new city" branches per city rather than into one flow, so it routes
+    // through its own choice screen the same way friday night does
+    if (pillId === "new-city") {
+      setStage("cityChoice");
       return;
     }
     const demo = PILL_DEMOS[pillId];
@@ -387,6 +449,14 @@ export default function Home() {
     setStage("idle");
   };
 
+  // every city is the same answer with its own copy, map and photos, so one demo carries
+  // them all and the picked city says which guide to read
+  const handleCitySelect = (cityId: string) => {
+    setCityId(cityId);
+    setActiveDemo("city");
+    setStage("typed");
+  };
+
   const handleSuggestionTap = () => setStage("typed");
 
   return (
@@ -415,7 +485,7 @@ export default function Home() {
           className="absolute inset-0 z-10 transition-opacity duration-500"
           style={{ opacity: showRundown ? 1 : 0, pointerEvents: showRundown ? "auto" : "none" }}
         >
-          <RundownScreen persona={rundownPersona} onBack={() => setStage("landing")} onSelectPill={handlePillSelect} />
+          <RundownScreen persona={rundownPersona} completed={completedPills} onBack={goHome} onSelectPill={handlePillSelect} />
         </div>
 
         {/* friday night branches into two demos — this picks which one before routing in */}
@@ -426,12 +496,21 @@ export default function Home() {
           <FridayNightChoiceScreen onBack={() => setStage("rundown")} onSelect={handleFridayNightChoice} />
         </div>
 
+        {/* "Explore a new city" branches per city — five of them, so it gets its own screen
+            rather than a fork. The backdrop rotates through the cities on offer. */}
+        <div
+          className="absolute inset-0 z-10 transition-opacity duration-500"
+          style={{ opacity: showCityChoice ? 1 : 0, pointerEvents: showCityChoice ? "auto" : "none" }}
+        >
+          <CityChoiceScreen onBack={() => setStage("rundown")} onSelect={handleCitySelect} />
+        </div>
+
         {/* The way out of a demo. The landing screen is home so it needs none, and the
             rundown and the friday-night choice draw their own (theirs step back one screen
             rather than all the way out). This is for everything after that: once a demo is
             playing there is otherwise nothing to tap until it finishes, which on a kiosk
             means a visitor who changes their mind is stuck watching an animation. */}
-        {showChat && <BackButton onClick={() => setStage("landing")} />}
+        {showChat && <BackButton onClick={goHome} />}
 
         {/* chat flow — top bar, hero/response, faded out while the landing screen is up */}
         <div
@@ -499,6 +578,22 @@ export default function Home() {
                   active={showResponse}
                   onComplete={handleDemoComplete}
                 />
+              ) : activeDemo === "dinner" ? (
+                <DinnerReservation
+                  // remounted per run: the booking it holds is per-run state
+                  key={showResponse ? "run" : "idle"}
+                  content={DINNER_RESERVATION}
+                  active={showResponse}
+                  onComplete={handleDemoComplete}
+                />
+              ) : activeDemo === "meeting" ? (
+                <MeetingBriefResponse
+                  // remounted per run, like the semester demo: all of its state is per-run
+                  key={showResponse ? "run" : "idle"}
+                  content={MEETING_BRIEF}
+                  active={showResponse}
+                  onComplete={handleDemoComplete}
+                />
               ) : activeDemo === "notebook" ? (
                 <StudyNotebook
                   // remounted per run, like the semester demo, so every run starts empty
@@ -516,7 +611,7 @@ export default function Home() {
                 />
               ) : (
                 <ScrollPattern
-                  content={RESPONSE_CONTENT_BY_DEMO[activeDemo]!}
+                  content={responseContent!}
                   active={showResponse}
                   onComplete={handleDemoComplete}
                 />
@@ -559,16 +654,34 @@ export default function Home() {
               (2) typing, still one line — the placeholder is replaced by live typed text in
                   that same narrow slot; Live is replaced in place by Send (not yet primed —
                   its ring pulse waits for the text to finish, only the plain button shows);
-              (3) multiLineLatched — once the text overflows that narrow slot, the box commits
-                  to the wider layout: text moves above a bottom toolbar (+, mic, Send), and
-                  the outer box expands to fit — growing only as fast as the text actually
-                  does, since the text slot below sizes to its own content, never stretched. */}
+              (3) multiLine — once the text overflows that narrow slot (or straight away, when
+                  the prompt carries an attachment), the box commits to the taller layout: an
+                  attachment chip on top, the text below it, a bottom toolbar (+, Send), and the
+                  outer box expands to fit — growing only as fast as the text actually does,
+                  since the text slot below sizes to its own content, never stretched.
+              The mic belongs to an empty box; it goes the moment typing starts. */}
           <div
             className={`absolute inset-0 flex text-left ${
-              multiLineLatched ? "flex-col justify-start gap-[0.6cqw] px-[2.2cqw] pt-[2.1cqw] pb-[1.3cqw]" : "flex-row items-center gap-[1.65cqw] px-[2.38cqw]"
+              multiLine ? "flex-col justify-start px-[1.9cqw] pb-[1.9cqw]" : "flex-row items-center gap-[1.65cqw] px-[2.9cqw]"
             }`}
+            style={multiLine ? { paddingTop: `${attachment ? ATTACHMENT_PT_CQW : MULTILINE_PT_CQW}cqw` } : undefined}
           >
-            {!multiLineLatched && <img src="/gemini/icon-plus.svg" alt="" className="h-[2.57cqw] w-[2.57cqw] shrink-0" />}
+            {!multiLine && <img src="/gemini/icon-plus.svg" alt="" className="h-[2.57cqw] w-[2.57cqw] shrink-0" />}
+
+            {multiLine && attachment && (
+              <div
+                className="-ml-[0.7cqw] flex max-w-[25cqw] shrink-0 items-center gap-[0.8cqw] self-start rounded-full bg-[#383838] pl-[1.2cqw] pr-[0.8cqw] [animation:fade-in-up_350ms_ease-out]"
+                style={{ height: `${ATTACHMENT_CHIP_CQW}cqw`, marginBottom: `${ATTACHMENT_GAP_CQW}cqw` }}
+              >
+                <img src={attachment.icon} alt="" className="h-[2cqw] w-[2cqw] shrink-0" />
+                <span className="min-w-0 truncate text-[1.55cqw] font-medium text-white">{attachment.name}</span>
+                <span className="flex h-[2cqw] w-[2cqw] shrink-0 items-center justify-center rounded-full bg-white text-[#1c1c1c]">
+                  <svg viewBox="0 0 24 24" className="h-[1.2cqw] w-[1.2cqw]" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round">
+                    <path d="M7 7l10 10M17 7L7 17" />
+                  </svg>
+                </span>
+              </div>
+            )}
 
             {/* sizes to its own content in both layouts — never flex-1/flex-grow (which would
                 stretch it to fill the box's current height and feed a runaway measurement
@@ -578,24 +691,24 @@ export default function Home() {
                 scrollHeight, the measurement stops updating and new text just clips) */}
             <div
               ref={liveTextRef}
-              className={`min-w-0 overflow-hidden text-[1.4cqw] leading-[1.9cqw] text-white ${multiLineLatched ? "w-full shrink-0" : "flex-1"}`}
+              className={`min-w-0 overflow-hidden text-[1.4cqw] leading-[2.2cqw] text-white ${multiLine ? "w-full shrink-0 px-[0.6cqw]" : "flex-1"}`}
             >
               {hasStartedTyping ? (
-                <TypingLines lines={PROMPT_LINES_BY_DEMO[activeDemo]} active={composeExpanded} tickMs={TYPING_TICK_MS} onDone={() => setTypingDone(true)} />
+                <TypingLines lines={promptLines} active={composeExpanded} tickMs={TYPING_TICK_MS} onDone={() => setTypingDone(true)} />
               ) : (
                 <p className="whitespace-nowrap text-muted">Ask Gemini</p>
               )}
             </div>
 
-            {!multiLineLatched ? (
+            {!multiLine ? (
               <div className="flex shrink-0 items-center gap-[0.92cqw]">
-                <img src="/gemini/icon-mic.svg" alt="" className="h-[2.57cqw] w-[2.57cqw]" />
+                {!hasStartedTyping && <img src="/gemini/icon-mic.svg" alt="" className="h-[2.57cqw] w-[2.57cqw]" />}
                 {hasStartedTyping ? (
                   <PulseRings active={typingDone}>
                     <button
                       type="button"
-                      onClick={() => setStage("response")}
-                      className="pointer-events-auto flex h-[4.4cqw] w-[4.4cqw] items-center justify-center rounded-full bg-[#1f3b9b]"
+                      onClick={() => setStage("response")} style={{ pointerEvents: showChat ? "auto" : "none" }}
+                      className="flex h-[4.4cqw] w-[4.4cqw] items-center justify-center rounded-full bg-[#1f3b9b]"
                     >
                       <img src="/gemini/icon-send.svg" alt="Send" className="h-[1.8cqw] w-[1.8cqw]" />
                     </button>
@@ -607,20 +720,17 @@ export default function Home() {
                 )}
               </div>
             ) : (
-              <div className="flex shrink-0 items-center justify-between">
-                <img src="/gemini/icon-plus.svg" alt="" className="h-[2.57cqw] w-[2.57cqw]" />
-                <div className="flex items-center gap-[1.5cqw]">
-                  <img src="/gemini/icon-mic.svg" alt="" className="h-[2.57cqw] w-[2.57cqw]" />
-                  <PulseRings active={typingDone}>
-                    <button
-                      type="button"
-                      onClick={() => setStage("response")}
-                      className="pointer-events-auto flex h-[2.62cqw] w-[2.62cqw] items-center justify-center rounded-full bg-[#1f3b9b]"
-                    >
-                      <img src="/gemini/icon-send.svg" alt="Send" className="h-[1.3cqw] w-[1.3cqw]" />
-                    </button>
-                  </PulseRings>
-                </div>
+              <div className="flex shrink-0 items-center justify-between" style={{ marginTop: `${MULTILINE_GAP_CQW}cqw` }}>
+                <img src="/gemini/icon-plus.svg" alt="" className="ml-[0.6cqw] h-[2.57cqw] w-[2.57cqw]" />
+                <PulseRings active={typingDone}>
+                  <button
+                    type="button"
+                    onClick={() => setStage("response")} style={{ pointerEvents: showChat ? "auto" : "none" }}
+                    className="flex h-[4.4cqw] w-[4.4cqw] items-center justify-center rounded-full bg-[#1f3b9b]"
+                  >
+                    <img src="/gemini/icon-send.svg" alt="Send" className="h-[1.8cqw] w-[1.8cqw]" />
+                  </button>
+                </PulseRings>
               </div>
             )}
           </div>
@@ -642,11 +752,15 @@ export default function Home() {
         {showResponse && demoComplete && (
           <>
             <div className="absolute bottom-[2.5cqw] right-[2.87cqw] z-20 [animation:fade-in-up_400ms_ease-out]">
-              <BackToRundownButton onClick={() => setStage("rundown")} />
+              <BackToRundownButton onClick={handleBackToRundown} />
             </div>
-            <div className="absolute bottom-[2.5cqw] left-[2.87cqw] z-20 [animation:fade-in-up_400ms_ease-out]">
-              <QrPrompt />
-            </div>
+            {/* the dinner flow ends on the widget setup screen, which carries a QR of its
+                own — one corner prompt beside it would just be a second one */}
+            {activeDemo !== "dinner" && (
+              <div className="absolute bottom-[2.5cqw] left-[2.87cqw] z-20 [animation:fade-in-up_400ms_ease-out]">
+                <QrPrompt />
+              </div>
+            )}
           </>
         )}
       </div>
