@@ -759,3 +759,19 @@ Reference: `~/Downloads/studentComplete.png`, `parentComplete.png`, `travelerCom
     being the screen;
   - the finished flow's "Back to your rundown" sat on top of the completion screen's "Start
     again" in the same corner; the ending is now gated on the chat too.
+
+### 2026-09-25 — An intro before the picker
+Reference: `~/Downloads/Screenshot 2026-09-25 at 12.00.55/12.01.06/12.01.18 AM.png`.
+- The kiosk now opens on `IntroScreen` once, on first load only: "Create, explore, and get
+  organized with" lands, then Google's own mark, which turns through a half-rotation and
+  becomes the Gemini star as the two cross-fade, and then the pair slide left while
+  "Google Gemini" is uncovered. ~5.2s, then it fades into the persona picker.
+- **How the last beat is done:** the wordmark sits in a box that widens from nothing with the
+  artwork pinned to the box's right edge, so the name is revealed from its end back to its
+  start — and because the row is centred, the star is carried left by the same growth rather
+  than being animated there separately. One transition, two movements.
+- **Assets, all already in the set:** `super-g.svg`, `gi-spark-color.svg`,
+  `google-gemini-dark.svg` (the wordmark alone — the star in the lockup is the separate file,
+  which is what lets the two animate apart).
+- Only the first load sees it: every way back — Start again, the corner button — goes to the
+  picker, and the intro is the initial stage rather than a screen anything routes to.

@@ -39,6 +39,7 @@ import {
 } from "@/components/kiosk/types";
 import TypingLines from "@/components/kiosk/TypingLines";
 import RundownScreen from "@/components/kiosk/RundownScreen";
+import IntroScreen from "@/components/kiosk/IntroScreen";
 import PersonaCompleteScreen from "@/components/kiosk/PersonaCompleteScreen";
 import RotatingChoiceScreen from "@/components/kiosk/RotatingChoiceScreen";
 import FridayNightChoiceScreen from "@/components/kiosk/FridayNightChoiceScreen";
@@ -55,7 +56,7 @@ import StudyNotebook from "@/components/kiosk/StudyNotebook";
 import ScrollPattern from "@/components/kiosk/patterns/ScrollPattern";
 import { BackButton, GradientPillButton, PulseRings, useThinkingPhase } from "@/components/kiosk/shared";
 
-type Stage = "landing" | "rundown" | "fridayNightChoice" | "cityChoice" | "partyChoice" | "complete" | "idle" | "typed" | "response";
+type Stage = "intro" | "landing" | "rundown" | "fridayNightChoice" | "cityChoice" | "partyChoice" | "complete" | "idle" | "typed" | "response";
 
 // which built demo the compose bar / response area are currently playing
 type DemoId = "weekend" | "fridayNight" | "goOut" | "bandTour" | "semester" | "notebook" | "meeting" | "dinner" | "city" | "party" | "playDate" | "dinnerPlan" | "voice";
@@ -252,7 +253,9 @@ function QrPrompt() {
 }
 
 export default function Home() {
-  const [stage, setStage] = useState<Stage>("landing");
+  // the kiosk opens on the intro once, and only on first load: every way back from here
+  // goes to the picker, never to this again
+  const [stage, setStage] = useState<Stage>("intro");
   const [rundownPersona, setRundownPersona] = useState<Persona>(DEFAULT_RUNDOWN_PERSONA);
   const [activeDemo, setActiveDemo] = useState<DemoId>("weekend");
   // whichever demo is playing, once its content has fully finished — shows the shared
@@ -304,6 +307,7 @@ export default function Home() {
     return () => ro.disconnect();
   }, []);
 
+  const showIntro = stage === "intro";
   const showLanding = stage === "landing";
   const showRundown = stage === "rundown";
   const showFridayNightChoice = stage === "fridayNightChoice";
@@ -311,7 +315,13 @@ export default function Home() {
   const showPartyChoice = stage === "partyChoice";
   const showComplete = stage === "complete";
   const showChat =
-    !showLanding && !showRundown && !showFridayNightChoice && !showCityChoice && !showPartyChoice && !showComplete;
+    !showIntro &&
+    !showLanding &&
+    !showRundown &&
+    !showFridayNightChoice &&
+    !showCityChoice &&
+    !showPartyChoice &&
+    !showComplete;
   const composeExpanded = stage === "typed";
   const showHero = stage === "idle";
   const showResponse = stage === "response";
@@ -473,6 +483,9 @@ export default function Home() {
       setStage("idle");
     }
   };
+
+  // stable, because IntroScreen holds it in an effect that owns the run's timers
+  const handleIntroDone = useCallback(() => setStage("landing"), []);
 
   const goHome = () => {
     setCompletedPills(new Set());
@@ -671,6 +684,14 @@ export default function Home() {
           style={{ opacity: showRundown ? 1 : 0, pointerEvents: showRundown ? "auto" : "none" }}
         >
           <RundownScreen persona={rundownPersona} completed={completedPills} onBack={goHome} onSelectPill={handlePillSelect} />
+        </div>
+
+        {/* the intro, above everything: it is what the kiosk opens on */}
+        <div
+          className="absolute inset-0 z-30 transition-opacity duration-700"
+          style={{ opacity: showIntro ? 1 : 0, pointerEvents: showIntro ? "auto" : "none" }}
+        >
+          <IntroScreen onDone={handleIntroDone} />
         </div>
 
         {/* the end of a persona's day: every flow played, nothing left on the rundown */}
